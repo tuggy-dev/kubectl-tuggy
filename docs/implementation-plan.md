@@ -54,13 +54,12 @@ flowchart LR
 ### 1.1 Foundations
 
 - `go.mod` (`github.com/tuggy-dev/kubectl-tuggy`), `cmd/kubectl-tuggy/main.go`, cobra root command, `version` command with build info.
-- `internal/provider`: the `Provider` interface, shared types (`CheckResult`, `ClusterInfo`, options), the registry (`Register`, `Get`, `Names`), and the optional `FlagBinder` interface. `internal/providers` with blank imports.
-- A fake provider used only in tests, to prove the CLI works through the interface alone.
+- Exit codes from the design, with unknown commands, flags, and arguments mapped to exit code 2.
 - `Makefile`: `build`, `test`, `lint`, `fmt`, `install` (copies to a PATH directory).
 - `.golangci.yml`, `.editorconfig`.
 - CI workflow: lint, unit tests, and build on `ubuntu`, `macos`, and `windows` runners. DCO check.
 
-**Done when:** `kubectl tuggy version` works after `make install` on all three OSes in CI, and a test registers the fake provider and looks it up by name.
+**Done when:** `kubectl tuggy version` works after `make install` on all three OSes in CI.
 
 ### 1.2 Cluster spec ∥
 
@@ -69,13 +68,16 @@ flowchart LR
 
 **Done when:** table-driven tests cover defaults and every validation rule.
 
-### 1.3 Local store ∥
+### 1.3 Local store and provider interface
 
 - `internal/store`: `Store` interface, and a local implementation with the `~/.tuggy` layout, `record.yaml` read/write, status transitions (Creating, Ready, Failed, Deleting) enforced in one place.
 - Per-cluster lock file (cross-platform, for example `gofrs/flock`), stale-lock detection.
 - Owner-only permissions on Linux and macOS; documented behaviour on Windows (user profile ACLs).
 
-**Done when:** tests cover every allowed and forbidden transition, and two processes can't lock the same cluster.
+- `internal/provider`: the `Provider` interface, shared types (`CheckResult`, `ClusterInfo`, options), the registry (`Register`, `Get`, `Names`), and the optional `FlagBinder` interface. `internal/providers` with blank imports. This comes after the spec and store because the interface uses both types.
+- A fake provider used only in tests, to prove the CLI works through the interface alone.
+
+**Done when:** tests cover every allowed and forbidden transition, two processes can't lock the same cluster, and a test registers the fake provider and looks it up by name.
 
 ### 1.4 Container runner ∥
 
