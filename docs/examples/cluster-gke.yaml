@@ -1,0 +1,20 @@
+# A small GKE cluster for development.
+#
+# Create it with:
+#   kubectl tuggy create cluster -f docs/examples/cluster-gke.yaml
+apiVersion: tuggy.dev/v1alpha1
+kind: Cluster
+metadata:
+  name: dev                       # lowercase letters, digits and '-', max 40 characters
+spec:
+  platform: gke
+  kubernetesVersion: ""           # empty = GKE's default for the release channel
+  ttl: 8h                         # tuggy reports the cluster as expired after 8 hours; 0 = never
+  nodePools:
+    - name: default
+      machineType: e2-standard-2
+      count: 1
+      spot: false
+  platformConfig:                 # GKE-specific settings, checked by the gke platform
+    project: my-project-id
+    location: us-central1-a       # a zone gives a zonal cluster, a region a regional one
