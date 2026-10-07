@@ -412,12 +412,14 @@ The GKE module does not use the Kubernetes OpenTofu provider (no workloads in th
 
 | Concern | Design |
 |---|---|
-| Runtime | Docker Engine API through the standard environment (`DOCKER_HOST`, Docker contexts). Works with Docker Desktop, Docker Engine, Podman, Colima, Rancher Desktop. |
+| Runtime | Docker Engine API (`github.com/moby/moby/client`). Works with Docker Engine, Docker Desktop, Colima, Rancher Desktop, OrbStack, Podman. |
+| Engine discovery | Same order as the `docker` CLI, so tuggy uses whatever engine `docker ps` uses: `DOCKER_HOST`, then `DOCKER_CONTEXT`, then the current context in `~/.docker/config.json`, then the OS default (`/var/run/docker.sock`, or the `docker_engine` named pipe on Windows). |
+| Shared folders | Engines that run in a VM (Docker Desktop, Colima, Rancher Desktop) share only the home directory by default. `~/.tuggy` is under it; a custom `TUGGY_HOME` must be too. |
 | Mounts | Workspace read-write at `/workspace`. Credentials read-only. Named volume `tuggy-plugin-cache` for OpenTofu provider plugin downloads. |
 | Paths | Host paths resolved to absolute paths and converted for Windows. |
 | Output | `Tty: false`; demultiplex stdout and stderr. OpenTofu runs with `-json` so progress comes from structured events, not text matching. Full output is written to the log file. |
 | Success | Decided by `ContainerWait` exit code only. |
-| Cancellation | Ctrl-C sends SIGINT to OpenTofu so it can release the state lock, waits up to 60s, then kills. |
+| Cancellation | Ctrl-C sends SIGINT to OpenTofu so it can release the state lock, waits up to 60s, then kills. Containers run with a small init process so the signal reaches OpenTofu. Starting a container is never cut short, so a Ctrl-C right after start still stops it gracefully. |
 | File ownership | On Linux, run as the caller's UID/GID so the workspace is not left root-owned. |
 | Cleanup | Containers are labelled `dev.tuggy.cluster=<name>` and removed after each run. |
 
