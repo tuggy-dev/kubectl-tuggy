@@ -26,6 +26,9 @@ type Info struct {
 	Date      string `json:"date,omitempty"`
 	GoVersion string `json:"goVersion"`
 	Platform  string `json:"platform"`
+
+	// TofuImage is the OpenTofu image this build runs. Filled in by the CLI.
+	TofuImage string `json:"tofuImage,omitempty"`
 }
 
 // Get returns build information, filling gaps from the embedded build info.

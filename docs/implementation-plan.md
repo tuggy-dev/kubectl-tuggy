@@ -88,13 +88,13 @@ flowchart LR
 
 **Done when:** integration tests on the Linux CI runner start a small image and verify exit codes, stream separation, and cancellation. Unit tests cover path conversion for Windows.
 
-### 1.5 tofu image ∥
+### 1.5 OpenTofu image
 
-- `images/tofu/Dockerfile` based on the official OpenTofu image, pinned version.
-- Workflow to build multi-arch (amd64, arm64) and push to `ghcr.io/tuggy-dev/tofu` on changes and on release.
-- Image reference and digest embedded in the binary at build time.
+- Use the official `ghcr.io/opentofu/opentofu` image instead of building one: it is multi-architecture and has everything needed (checked: provider downloads over HTTPS, `init`/`apply` on a mounted folder, running as a non-root user with `HOME` set).
+- Pin an exact version by digest in `internal/engine/tofu.DefaultImage`; `TUGGY_TOFU_IMAGE` overrides it for mirrors.
+- `kubectl tuggy version` prints the pinned image.
 
-**Done when:** the image is published and the binary prints its pinned image in `version`.
+**Done when:** an integration test runs `tofu version` with the pinned image through tuggy's runner.
 
 ### 1.6 OpenTofu engine
 

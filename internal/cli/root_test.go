@@ -11,6 +11,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	"github.com/tuggy-dev/kubectl-tuggy/internal/engine/tofu"
 	"github.com/tuggy-dev/kubectl-tuggy/internal/version"
 )
 
@@ -61,6 +62,7 @@ func TestHelpShowsKubectlPluginName(t *testing.T) {
 
 func TestVersionOutput(t *testing.T) {
 	want := version.Get()
+	want.TofuImage = tofu.Image()
 
 	t.Run("text", func(t *testing.T) {
 		_, stdout, _ := run(t, "version")

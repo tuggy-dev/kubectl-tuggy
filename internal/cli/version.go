@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
+	"github.com/tuggy-dev/kubectl-tuggy/internal/engine/tofu"
 	"github.com/tuggy-dev/kubectl-tuggy/internal/version"
 )
 
@@ -19,6 +20,7 @@ func newVersionCommand(streams IOStreams) *cobra.Command {
 		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			info := version.Get()
+			info.TofuImage = tofu.Image()
 
 			switch output {
 			case "":
@@ -31,6 +33,7 @@ func newVersionCommand(streams IOStreams) *cobra.Command {
 				}
 				fmt.Fprintf(streams.Out, "  go:       %s\n", info.GoVersion)
 				fmt.Fprintf(streams.Out, "  platform: %s\n", info.Platform)
+				fmt.Fprintf(streams.Out, "  opentofu: %s\n", info.TofuImage)
 				return nil
 			case "json":
 				b, err := json.MarshalIndent(info, "", "  ")

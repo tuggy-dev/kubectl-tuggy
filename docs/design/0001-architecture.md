@@ -401,9 +401,11 @@ Runs every platform's preflight checks and prints pass/fail with a fix for each 
 
 ### Image
 
-- Default is a tuggy image, `ghcr.io/tuggy-dev/tofu:<version>`, published from this repo, built `FROM` the official OpenTofu image. It replaces the demo's private toolbox image. It exists so we control the OpenTofu version and can add tools if a platform needs them.
-- The image is pinned by digest in each tuggy release, so a tuggy version always runs the same OpenTofu.
-- `--tofu-image` or `config.yaml` overrides it, for air-gapped mirrors.
+- The official OpenTofu image, `ghcr.io/opentofu/opentofu`, replaces the demo's private toolbox image. It is multi-architecture, includes CA certificates, `git` and `ssh`, and has `tofu` as its entrypoint, so tuggy does not build or publish an image of its own.
+- Each tuggy release pins an exact version by digest (`internal/engine/tofu.DefaultImage`), so a tuggy version always runs the same OpenTofu even if the tag is re-published. `kubectl tuggy version` prints it.
+- `TUGGY_TOFU_IMAGE` (later also `config.yaml`) overrides it, for internal mirrors.
+- When running as a non-root user (Linux), tuggy sets `HOME` to a writable directory inside the container.
+- A tuggy-built image would only be added if a future platform needs extra tools in the container; the override means no code change for users.
 - Pulled on first use, with progress shown. If pulling fails but the image is present locally, tuggy continues (as the demo did).
 
 The GKE module does not use the Kubernetes OpenTofu provider (no workloads in the module, R8), so the image does not need `gke-gcloud-auth-plugin`.
@@ -486,7 +488,6 @@ internal/engine/tofu/
 internal/runner/
 internal/kubeconfig/
 internal/clustermeta/           cluster metadata store: records, folders, locks, logs
-images/tofu/Dockerfile
 docs/  hack/  .github/workflows/
 ```
 
@@ -504,7 +505,7 @@ docs/  hack/  .github/workflows/
 - GoReleaser builds for linux, darwin, and windows on amd64 and arm64.
 - SHA-256 checksums, SBOM, and cosign keyless signatures.
 - Krew manifest generated per release; submit to the Krew index after v0.1 (R2).
-- The tofu image is built and pushed by the same release workflow, and its digest embedded in the binary.
+- The pinned OpenTofu image digest is part of each release and shown by `kubectl tuggy version`.
 - SemVer. The `v1alpha1` spec file format may change before v1.0, always called out in release notes.
 
 ## Phases
@@ -512,7 +513,7 @@ docs/  hack/  .github/workflows/
 | Phase | Version | Scope |
 |---|---|---|
 | 0 | n/a | Repo bootstrap and this design |
-| 1 | v0.1.0 | Spec file format, store, engine, runner, GKE platform and module, create/delete/get/describe/kubeconfig/doctor, TTL, CI, release, tofu image |
+| 1 | v0.1.0 | Spec file format, store, engine, runner, GKE platform and module, create/delete/get/describe/kubeconfig/doctor, TTL, CI, release |
 | 2 | v0.2.0 | Bare metal platform |
 | 3 | v0.3.0 | `install <addon>` with Helm; Krew index submission; docs site at tuggy.dev |
 | Later | | EKS and AKS platforms, Cluster API manifests as input, `upgrade cluster`, `scale nodepool`, remote state, scheduled TTL cleanup |
