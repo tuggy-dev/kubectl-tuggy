@@ -12,9 +12,9 @@ Estimates assume one developer working full time and are rough. Two developers c
 | 1. GKE (v0.1.0) | Create, list, describe, and delete GKE clusters safely on Windows, macOS, Linux | 5–6 weeks |
 | 2. Bare metal (v0.2.0) | Clusters on user-provided machines | 3–4 weeks |
 | 3. Add-ons and distribution (v0.3.0) | `install <addon>`, Krew index, docs site | 3 weeks |
-| 4. Later | EKS and AKS providers, upgrade, scale, remote state, scheduled cleanup | Ongoing |
+| 4. Later | EKS and AKS platforms, Cluster API manifests as input, upgrade, scale, remote state, scheduled cleanup | Ongoing |
 
-AWS is out of scope until phase 4. Phase 1 builds the provider, runner, and store interfaces so EKS can be added later as a self-contained package without changing the core (see "Interfaces and extension points" in design 0001).
+AWS is out of scope until phase 4. Phase 1 builds the platform, runner, and store interfaces so EKS can be added later as a self-contained package without changing the core (see "Interfaces and extension points" in design 0001).
 
 ```mermaid
 flowchart LR
@@ -63,21 +63,22 @@ flowchart LR
 
 ### 1.2 Cluster spec ∥
 
-- `pkg/apis/v1alpha1`: `Cluster`, `NodePool`, raw `providerConfig`, defaults, common validation (name rules, TTL parsing). No provider-specific types here.
+- `internal/input/specfile/v1alpha1`: the spec file format only. `Cluster`, `NodePool`, raw `platformConfig`, defaults, common validation (name rules, TTL parsing). No platform-specific types here; platforms translate this format into their own typed variables.
 - Load from YAML (`-f`) with strict decoding (unknown fields are errors). Flags map onto the same type.
 
 **Done when:** table-driven tests cover defaults and every validation rule.
 
-### 1.3 Local store and provider interface
+### 1.3 Local store and platform interface
 
 - `internal/store`: `Store` interface, and a local implementation with the `~/.tuggy` layout, `record.yaml` read/write, status transitions (Creating, Ready, Failed, Deleting) enforced in one place.
 - Per-cluster lock file (cross-platform, for example `gofrs/flock`), stale-lock detection.
 - Owner-only permissions on Linux and macOS; documented behaviour on Windows (user profile ACLs).
 
-- `internal/provider`: the `Provider` interface, shared types (`CheckResult`, `ClusterInfo`, options), the registry (`Register`, `Get`, `Names`), and the optional `FlagBinder` interface. `internal/providers` with blank imports. This comes after the spec and store because the interface uses both types.
-- A fake provider used only in tests, to prove the CLI works through the interface alone.
+- The record holds only tuggy's own facts (name, platform, status, created time, TTL, tuggy version, outputs); everything the user asked for stays in the platform's own files.
+- `internal/platform`: the `Platform` interface (`FromV1Alpha1`, `Preflight`, `Create`, `Delete`, `Describe`, `Kubeconfig`, `ListRemote`), shared types (`Plan`, `CheckResult`, `ClusterInfo`, options), the registry (`Register`, `Get`, `Names`), and the optional `FlagBinder` interface. `internal/platforms` with blank imports. This comes after the spec and store because the interface uses both types.
+- A fake platform used only in tests, to prove the CLI works through the interface alone.
 
-**Done when:** tests cover every allowed and forbidden transition, two processes can't lock the same cluster, and a test registers the fake provider and looks it up by name.
+**Done when:** tests cover every allowed and forbidden transition, two processes can't lock the same cluster, and a test registers the fake platform and looks it up by name.
 
 ### 1.4 Container runner ∥
 
@@ -105,15 +106,17 @@ flowchart LR
 
 ### 1.7 GKE module ∥
 
-- `internal/provider/gke/module`: cluster with default pool removed, node pools from a list, Workload Identity, release channel, labels (`managed-by`, `tuggy-cluster`, `tuggy-expires-at`), optional impersonation. Outputs: name, location, project, endpoint, CA, version.
-- Embedded with `go:embed` from inside the gke package, so the module ships with its provider.
-- CI: `tofu fmt -check`, `tofu validate`, and `tofu test` with mocked providers.
+- `internal/platform/gke/module`: cluster with default pool removed, node pools from a list, Workload Identity, release channel, labels (`managed-by`, `tuggy-cluster`, `tuggy-expires-at`), optional impersonation. Outputs: name, location, project, endpoint, CA, version.
+- Embedded with `go:embed` from inside the gke package, so the module ships with its platform.
+- CI: `tofu fmt -check`, `tofu validate`, and `tofu test` with mocked OpenTofu providers.
 
 **Done when:** module tests pass in CI and a manual apply in the sandbox project works.
 
-### 1.8 GKE provider: config, credentials, preflight
+### 1.8 GKE platform: config, variables, credentials, preflight
 
-- `internal/provider/gke`: config type decoded from `providerConfig`, validation, provider-specific flags (`--project`, `--location`) via `FlagBinder`.
+- `internal/platform/gke`: config type decoded from `platformConfig`, validation, platform-specific flags (`--project`, `--location`) via `FlagBinder`.
+- `gke.Variables`, a typed struct mirroring the module's `variables.tf`, and `FromV1Alpha1` translating the spec into it. A contract test checks the struct and the module's declared variables match exactly.
+- `Describe`, reading location and node pools back from the cluster's variables file.
 - Google ADC discovery (env var, gcloud file on each OS), returning the single file to mount and the account email.
 - GKE preflight using Google's Go SDK: credentials valid, required permissions present (`testIamPermissions` on the project), Kubernetes Engine API enabled. Each failure has a fix hint.
 - Shared checks: container runtime reachable, image available or pullable, `gke-gcloud-auth-plugin` on PATH.
@@ -122,7 +125,7 @@ flowchart LR
 
 ### 1.9 Kubeconfig and readiness
 
-- GKE provider builds its kubeconfig entry from outputs with the exec auth plugin.
+- GKE platform builds its kubeconfig entry from outputs with the exec auth plugin.
 - `internal/kubeconfig`: merge into the user's kubeconfig, switch context, remove only tuggy's entries on delete.
 - Readiness check: `/readyz` and `/version` with retries up to 2 minutes.
 
@@ -137,7 +140,7 @@ flowchart LR
 - Resume: `create` on a `Failed` record re-applies.
 - `~/.tuggy/config.yaml` for defaults (project, location, TTL, image).
 
-**Done when:** command tests run against fake provider and runner, covering confirmation, `--yes`, resume, and every exit code. Each of the 13 demo defects in the design has a test proving it is fixed.
+**Done when:** command tests run against fake platform and runner, covering confirmation, `--yes`, resume, and every exit code. Each of the 13 demo defects in the design has a test proving it is fixed.
 
 ### 1.11 End-to-end, docs, release
 
@@ -156,7 +159,7 @@ flowchart LR
 |---|---|
 | 2.1 Decision record | Choose k3s, kubeadm, or Talos (design 0002). Define the inventory format (hosts, SSH user, key, roles). |
 | 2.2 Backend | SSH executor (or Talos API client), idempotent install steps, join tokens, HA control plane option. |
-| 2.3 Provider | Implements the same `Provider` interface: create, delete (uninstall and clean), kubeconfig from the control plane. |
+| 2.3 Platform | Implements the same `Platform` interface: create, delete (uninstall and clean), kubeconfig from the control plane. |
 | 2.4 Tests | E2E against throwaway VMs (for example cloud VMs created by the test, then deleted). Docs. |
 
 ---
@@ -174,13 +177,14 @@ flowchart LR
 
 ## Phase 4: later
 
-- EKS provider: `internal/provider/eks` with its module (dedicated VPC, IAM roles, managed node groups), AWS credential discovery, preflight, `aws eks get-token` kubeconfig, E2E in an AWS sandbox account.
-- AKS provider, the same way.
+- EKS platform: `internal/platform/eks` with its module and typed variables (dedicated VPC, IAM roles, managed node groups), AWS credential discovery, preflight, `aws eks get-token` kubeconfig, E2E in an AWS sandbox account.
+- AKS platform, the same way.
+- Cluster API manifests as an input format: a `FromCAPI` translation per platform (see open question 6 in design 0001).
 - `upgrade cluster` (Kubernetes version and tuggy module version).
 - `scale nodepool`.
 - Remote state (GCS, S3) for teams sharing clusters.
 - Optional scheduled TTL cleanup running in the user's cloud.
-- Local kind provider.
+- Local kind platform.
 
 ## Risks
 

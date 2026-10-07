@@ -10,7 +10,7 @@ Thanks for your interest in tuggy! This guide explains how to propose changes.
 
 ## Design proposals
 
-Significant changes (new providers, new commands, changes to the `Cluster` spec) need a short design record in [`docs/design/`](docs/design/). Copy the format of [0001-architecture.md](docs/design/0001-architecture.md), number it sequentially, and open it as a pull request for discussion.
+Significant changes (new platforms, new commands, changes to the spec file format) need a short design record in [`docs/design/`](docs/design/). Copy the format of [0001-architecture.md](docs/design/0001-architecture.md), number it sequentially, and open it as a pull request for discussion.
 
 ## Pull requests
 

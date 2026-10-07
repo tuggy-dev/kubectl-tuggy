@@ -5,7 +5,7 @@
 `kubectl tuggy` is a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/) that turns common Kubernetes chores into one command, starting with creating clusters on GKE and bare metal.
 
 ```sh
-kubectl tuggy create cluster dev --provider gke --project my-proj --region us-central1
+kubectl tuggy create cluster dev --platform gke --project my-proj --location us-central1-a
 kubectl tuggy get clusters
 kubectl tuggy delete cluster dev
 ```
@@ -24,7 +24,7 @@ kubectl tuggy delete cluster dev
 
 ## How it works
 
-For cloud providers, tuggy generates an [OpenTofu](https://opentofu.org/) configuration from modules built into the plugin, then runs OpenTofu in a container. Each cluster gets its own workspace under `~/.tuggy/clusters/<name>/`, so you can always inspect the exact code and state that built it.
+For cloud platforms, tuggy runs [OpenTofu](https://opentofu.org/) modules built into the plugin, with inputs generated from your flags or spec file, in a container. Each cluster gets its own workspace under `~/.tuggy/clusters/<name>/`, so you can always inspect the exact code and state that built it.
 
 You'll need:
 
