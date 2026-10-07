@@ -19,6 +19,11 @@ linters:
   exclusions:
     presets:
       - std-error-handling
+    rules:
+      # Tests deliberately write to temporary paths and re-run their own binary.
+      - path: _test\.go
+        linters:
+          - gosec
 
 formatters:
   enable:

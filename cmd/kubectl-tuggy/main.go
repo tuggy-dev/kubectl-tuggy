@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/tuggy-dev/kubectl-tuggy/internal/cli"
+	_ "github.com/tuggy-dev/kubectl-tuggy/internal/platforms" // registers built-in platforms
 )
 
 func main() {

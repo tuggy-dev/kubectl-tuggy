@@ -188,7 +188,7 @@ flowchart LR
 | `internal/engine/tofu` | Reusable OpenTofu helper: workspace, writing the variables file, init/plan/apply/destroy, JSON event parsing. Knows nothing about specific clouds. Used by cloud platforms; bare metal may not use it. |
 | `internal/runner` | `Runner` interface for running a command in a container, with a Docker implementation and a fake for tests. |
 | `internal/kubeconfig` | Merges kubeconfig entries with `client-go`. Platforms supply the entry. |
-| `internal/store` | `Store` interface for cluster records and locks, with a local `~/.tuggy` implementation. |
+| `internal/clustermeta` | The cluster metadata store: `Store` interface for each cluster's record, folder, lock, and logs, with a local `~/.tuggy` implementation. Does not hold OpenTofu state or platform files. |
 
 ### Interfaces and extension points
 
@@ -219,14 +219,14 @@ type Platform interface {
     Preflight(ctx context.Context, p *Plan) []CheckResult
 
     Create(ctx context.Context, p *Plan, opts CreateOptions) (*ClusterInfo, error)
-    Delete(ctx context.Context, rec *store.Record, opts DeleteOptions) error
+    Delete(ctx context.Context, rec *clustermeta.Record, opts DeleteOptions) error
 
     // Describe reports the cluster's details (location, node pools, version)
     // from the platform's own files, such as its variables file.
-    Describe(ctx context.Context, rec *store.Record) (*ClusterInfo, error)
+    Describe(ctx context.Context, rec *clustermeta.Record, dir string) (*ClusterInfo, error)
 
     // Kubeconfig returns the cluster, user (with exec auth plugin) and context entries to merge.
-    Kubeconfig(ctx context.Context, rec *store.Record) (*clientcmdapi.Config, error)
+    Kubeconfig(ctx context.Context, rec *clustermeta.Record) (*clientcmdapi.Config, error)
 
     // ListRemote lists clusters in the cloud that tuggy didn't create, for
     // get --all. Platforms without a remote API return ErrNotSupported.
@@ -293,6 +293,7 @@ Everything tuggy knows lives under `~/.tuggy` (`%USERPROFILE%\.tuggy` on Windows
 ~/.tuggy/                                  (%USERPROFILE%\.tuggy on Windows)
 ├── config.yaml                            user defaults: platform, project, location, ttl, image
 ├── logs/<name>/                           logs of deleted clusters
+├── locks/<name>.lock                      held while a command works on a cluster
 └── clusters/
     └── dev/
         ├── record.yaml                    tuggy's facts: platform, status, created, ttl, version, outputs
@@ -305,9 +306,8 @@ Everything tuggy knows lives under `~/.tuggy` (`%USERPROFILE%\.tuggy` on Windows
         ├── .terraform/                    created by `tofu init`; links to the shared plugin cache
         ├── terraform.tfstate              this cluster's state only
         ├── terraform.tfstate.backup       previous state, written by OpenTofu
-        ├── logs/
-        │   └── 2026-10-07T15-02-11-create.log
-        └── .lock                          present only while a command works on this cluster
+        └── logs/
+            └── 2026-10-07T15-02-11-create.log
 ```
 
 | File | Written by | When |
@@ -318,7 +318,9 @@ Everything tuggy knows lives under `~/.tuggy` (`%USERPROFILE%\.tuggy` on Windows
 | `.terraform/` | OpenTofu | `tofu init` |
 | `terraform.tfstate`, `.backup` | OpenTofu | During `apply` and `destroy` |
 | `logs/*.log` | tuggy | Every run |
-| `.lock` | tuggy | Held during a command, removed at the end |
+| `locks/<name>.lock` | tuggy | Held during a command; the operating system releases it if tuggy exits or crashes |
+
+Locks live outside the cluster folder because a cluster must be locked before its folder exists and while the folder is removed (Windows cannot delete a folder containing an open, locked file).
 
 Not kept: the saved plan file between `plan` and `apply` (it can contain secrets, so tuggy deletes it after use), and the downloaded OpenTofu provider plugins, which live in a shared Docker volume. The original spec file is not copied either: everything it said is in `terraform.tfvars.json`, and the platform can rebuild a spec from that if needed. After `delete`, the cluster's folder is removed and its logs move to `~/.tuggy/logs/<name>/`.
 
@@ -326,14 +328,16 @@ Not kept: the saved plan file between `plan` and `apply` (it can contain secrets
 
 tuggy has no server, so each command starts knowing nothing. `record.yaml` is how later commands learn what earlier ones did. It has the same shape for every platform, so `get clusters`, expiry warnings, and `delete` work without understanding any platform's files.
 
-The record holds **only facts that belong to tuggy** and that the variables file cannot hold: the platform, run status, timestamps, TTL, tuggy version, and outputs that exist only after creation. Everything the user asked for (project, location, node pools) lives only in the platform's own files, such as the variables file. Commands that need those details ask the platform through `Describe`, so every fact has exactly one home.
+The record holds **only facts that belong to tuggy** and that the variables file cannot hold: the platform, run status, timestamps, expiry, tuggy version, and outputs that exist only after creation. Everything the user asked for (project, location, node pools) lives only in the platform's own files, such as the variables file. Commands that need those details ask the platform through `Describe`, so every fact has exactly one home.
 
 ```yaml
 name: dev
 platform: gke
 status: Ready                      # Creating | Ready | Failed | Deleting
-createdAt: 2026-10-07T15:02:11Z
-ttl: 8h
+message: ""                        # why the last operation failed, if it did
+createdAt: "2026-10-07T15:02:11Z"
+updatedAt: "2026-10-07T15:13:40Z"
+expiresAt: "2026-10-07T23:02:11Z"  # created + ttl; absent = never expires
 tuggyVersion: v0.1.0               # which tuggy, and so which module, built it
 outputs:
   endpoint: https://34.123.45.67
@@ -368,9 +372,9 @@ Remote state (GCS/S3) for teams is a later phase. The record format leaves room 
 
 1. Parse flags or the file into a `v1alpha1.Cluster`, apply defaults, validate.
 2. Look up the platform and translate: `FromV1Alpha1` returns a `Plan` with typed variables. Platform-specific validation happens here.
-3. Refuse if a record with that name exists and is `Ready` or `Deleting`.
+3. Take the cluster's lock, so no other tuggy command can work on it at the same time. Then refuse if a record with that name exists and is `Ready` or `Deleting`.
 4. Preflight: container runtime reachable, credentials found, required IAM permissions present (R5), required APIs enabled. Stop with a clear message on the first blocking failure.
-5. Write the workspace (module, variables file) and `record.yaml` with status `Creating`. Take the lock.
+5. Write the workspace (module, variables file) and `record.yaml` with status `Creating`.
 6. In the container: `tofu init`, then `tofu plan -out=plan`, then `tofu apply plan`. Applying the saved plan guarantees we apply exactly what was planned. `--dry-run` stops after plan and prints a summary.
 7. Read outputs with `tofu output -json` and store them in the record.
 8. Verify: build a kubeconfig and call `/readyz` and `/version` on the API server, retrying for up to 2 minutes (R4).
@@ -479,7 +483,7 @@ internal/platforms/             blank imports of built-in platforms
 internal/engine/tofu/
 internal/runner/
 internal/kubeconfig/
-internal/store/
+internal/clustermeta/           cluster metadata store: records, folders, locks, logs
 images/tofu/Dockerfile
 docs/  hack/  .github/workflows/
 ```

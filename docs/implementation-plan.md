@@ -70,11 +70,11 @@ flowchart LR
 
 ### 1.3 Local store and platform interface
 
-- `internal/store`: `Store` interface, and a local implementation with the `~/.tuggy` layout, `record.yaml` read/write, status transitions (Creating, Ready, Failed, Deleting) enforced in one place.
-- Per-cluster lock file (cross-platform, for example `gofrs/flock`), stale-lock detection.
+- `internal/clustermeta` (the cluster metadata store): `Store` interface, and a local implementation with the `~/.tuggy` layout, `record.yaml` read/write, status transitions (Creating, Ready, Failed, Deleting) enforced in one place.
+- Per-cluster lock in `~/.tuggy/locks/` (`gofrs/flock`). The operating system releases it if tuggy exits or crashes, so no stale-lock handling is needed.
 - Owner-only permissions on Linux and macOS; documented behaviour on Windows (user profile ACLs).
 
-- The record holds only tuggy's own facts (name, platform, status, created time, TTL, tuggy version, outputs); everything the user asked for stays in the platform's own files.
+- The record holds only tuggy's own facts (name, platform, status, message, timestamps, expiry, tuggy version, outputs); everything the user asked for stays in the platform's own files.
 - `internal/platform`: the `Platform` interface (`FromV1Alpha1`, `Preflight`, `Create`, `Delete`, `Describe`, `Kubeconfig`, `ListRemote`), shared types (`Plan`, `CheckResult`, `ClusterInfo`, options), the registry (`Register`, `Get`, `Names`), and the optional `FlagBinder` interface. `internal/platforms` with blank imports. This comes after the spec and store because the interface uses both types.
 - A fake platform used only in tests, to prove the CLI works through the interface alone.
 
