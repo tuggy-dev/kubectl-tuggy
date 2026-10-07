@@ -1,0 +1,39 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["kind/bug", "needs-triage"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the command you ran and its output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+  - type: input
+    id: version
+    attributes:
+      label: tuggy version
+      placeholder: output of `kubectl tuggy version`
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options: [gke, eks, metal, not provider-specific]
+  - type: input
+    id: platform
+    attributes:
+      label: OS and container runtime
+      placeholder: e.g. macOS 26 / Docker Desktop 4.x
+  - type: markdown
+    attributes:
+      value: "**Please redact project IDs, account IDs, and any credentials before submitting.**"

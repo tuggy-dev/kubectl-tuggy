@@ -1,0 +1,43 @@
+# kubectl-tuggy
+
+> Your Kubernetes sidekick. Like a tugboat, tuggy does the heavy pulling so you can steer.
+
+`kubectl tuggy` is a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/) that turns common Kubernetes chores into one command, starting with creating clusters on GKE and bare metal.
+
+```sh
+kubectl tuggy create cluster dev --provider gke --project my-proj --region us-central1
+kubectl tuggy get clusters
+kubectl tuggy delete cluster dev
+```
+
+> **Status: early development.** Nothing is released yet. See the [architecture and plan](docs/design/0001-architecture.md) for what's coming.
+
+## Planned features
+
+| Feature | Status |
+|---|---|
+| GKE clusters | Planned for v0.1 |
+| Bare metal clusters | Planned for v0.2 |
+| Install add-ons (ingress, cert-manager, databases) | Planned for v0.3 |
+| Install via [Krew](https://krew.sigs.k8s.io/) | Planned for v0.3 |
+| EKS and AKS clusters | Later |
+
+## How it works
+
+For cloud providers, tuggy generates an [OpenTofu](https://opentofu.org/) configuration from modules built into the plugin, then runs OpenTofu in a container. Each cluster gets its own workspace under `~/.tuggy/clusters/<name>/`, so you can always inspect the exact code and state that built it.
+
+You'll need:
+
+- `kubectl`
+- A Docker-compatible container runtime (Docker Desktop, Docker Engine, Podman, Colima, or Rancher Desktop)
+- Credentials for your cloud (for example `gcloud auth application-default login`)
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) to get started, and please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+To report a security issue, see [SECURITY.md](SECURITY.md). Please don't open a public issue.
+
+## License
+
+[Apache License 2.0](LICENSE)
