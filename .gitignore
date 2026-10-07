@@ -1,7 +1,7 @@
 # Binaries
 /bin/
 /dist/
-kubectl-tuggy
+/kubectl-tuggy
 *.exe
 *.test
 *.out
@@ -19,13 +19,16 @@ go.work.sum
 crash.log
 *.tfvars
 *.tfvars.json
-!modules/**/examples/*.tfvars
+# Test fixtures, such as expected variables files, are kept.
+!**/testdata/**
 
-# Credentials
-*credentials*.json
-*.pem
-*.key
-kubeconfig*
+# Credentials and kubeconfigs (anchored so packages like internal/kubeconfig
+# and test fixtures under testdata/ are not ignored)
+/*credentials*.json
+/*.pem
+/*.key
+/kubeconfig*
+*.kubeconfig
 
 # Editors and OS
 .idea/
