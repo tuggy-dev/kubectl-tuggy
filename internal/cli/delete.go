@@ -146,6 +146,9 @@ func (a *App) deleteCluster(ctx context.Context, name string, opts deleteOptions
 	if err := a.Kube.Remove(contextName(name)); err != nil {
 		a.warnf("could not remove context %q from your kubeconfig: %v", contextName(name), err)
 	}
+	// The log lives in the cluster's folder, which is about to be removed.
+	// Windows can't move or delete a file that is still open.
+	_ = logFile.Close()
 	if err := a.Store.Delete(name); err != nil {
 		return err
 	}

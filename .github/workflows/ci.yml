@@ -46,5 +46,8 @@ jobs:
         shell: bash
         run: |
           export PATH="$PWD/bin:$PATH"
-          kubectl plugin list 2>/dev/null | grep -q kubectl-tuggy
+          # kubectl plugin list exits non-zero when it warns about other
+          # plugins on the runner, so show it without failing on it.
+          kubectl plugin list || true
+          # This is the real check: kubectl finds and runs the plugin.
           kubectl tuggy version
