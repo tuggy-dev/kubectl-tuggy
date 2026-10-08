@@ -22,6 +22,8 @@ kubectl tuggy delete cluster dev
 | Install via [Krew](https://krew.sigs.k8s.io/) | Planned for v0.3 |
 | EKS and AKS clusters | Later |
 
+**New here?** Follow the [quickstart](docs/quickstart.md) to create and delete your first GKE cluster.
+
 ## How it works
 
 For cloud platforms, tuggy runs [OpenTofu](https://opentofu.org/) modules built into the plugin, with inputs generated from your flags or spec file, in a container. Each cluster gets its own workspace under `~/.tuggy/clusters/<name>/`, so you can always inspect the exact code and state that built it.
