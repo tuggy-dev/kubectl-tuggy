@@ -290,6 +290,11 @@ func TestKubeconfig(t *testing.T) {
 	if user == nil || user.Exec == nil || user.Exec.Command != "gke-gcloud-auth-plugin" || !user.Exec.ProvideClusterInfo {
 		t.Errorf("user = %+v", user)
 	}
+	// kubectl must use the same sign-in as OpenTofu (Application Default
+	// Credentials), not the separate gcloud CLI login.
+	if user != nil && user.Exec != nil && !slices.Equal(user.Exec.Args, []string{"--use_application_default_credentials"}) {
+		t.Errorf("exec args = %v", user.Exec.Args)
+	}
 	if ctx := cfg.Contexts["tuggy-dev"]; ctx == nil || ctx.Cluster != "tuggy-dev" || ctx.AuthInfo != "tuggy-dev" || cfg.CurrentContext != "tuggy-dev" {
 		t.Errorf("context = %+v, current %q", ctx, cfg.CurrentContext)
 	}

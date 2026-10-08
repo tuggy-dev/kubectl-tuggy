@@ -127,7 +127,7 @@ flowchart LR
 ### 1.9 Kubeconfig and readiness
 
 - GKE platform builds its kubeconfig entry from outputs with the exec auth plugin.
-- `internal/kubeconfig`: merge into the user's kubeconfig, switch context, remove only tuggy's entries on delete.
+- `internal/kubeconfig` (through client-go's `ModifyConfig`, like `kubectl config`): merge into the user's kubeconfig, switch context, remove only tuggy's entries on delete.
 - Readiness check: `/readyz` and `/version` with retries up to 2 minutes.
 
 **Done when:** merge and removal are tested against fixture kubeconfigs, including ones with many existing contexts.

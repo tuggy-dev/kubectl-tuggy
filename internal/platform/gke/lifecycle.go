@@ -160,8 +160,11 @@ func describeVariables(v Variables) *platform.ClusterInfo {
 	return result
 }
 
-// Kubeconfig returns entries for the cluster that authenticate with the
-// user's Google identity through gke-gcloud-auth-plugin, as gcloud does.
+// Kubeconfig returns entries for the cluster that authenticate through
+// gke-gcloud-auth-plugin using Application Default Credentials: the same
+// sign-in OpenTofu and preflight use, so users keep only one Google sign-in
+// fresh (gcloud auth application-default login) instead of also needing
+// gcloud auth login.
 func (p *Platform) Kubeconfig(_ context.Context, rec *clustermeta.Record) (*clientcmdapi.Config, error) {
 	endpoint, ca := rec.Outputs[OutputEndpoint], rec.Outputs[OutputCACertificate]
 	if endpoint == "" || ca == "" {
@@ -178,6 +181,7 @@ func (p *Platform) Kubeconfig(_ context.Context, rec *clustermeta.Record) (*clie
 	cfg.AuthInfos[name] = &clientcmdapi.AuthInfo{Exec: &clientcmdapi.ExecConfig{
 		APIVersion:         "client.authentication.k8s.io/v1beta1",
 		Command:            authPlugin,
+		Args:               []string{"--use_application_default_credentials"},
 		InstallHint:        "Install gke-gcloud-auth-plugin to use kubectl with GKE: gcloud components install gke-gcloud-auth-plugin",
 		ProvideClusterInfo: true,
 		InteractiveMode:    clientcmdapi.IfAvailableExecInteractiveMode,

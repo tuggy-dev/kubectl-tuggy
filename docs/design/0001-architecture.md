@@ -406,7 +406,7 @@ GKE checks, in order (later checks are skipped when one they depend on fails):
 | Check | Fails or warns when | Fix shown |
 |---|---|---|
 | Container engine | Docker API not reachable | Start Docker Desktop, Colima, …; check `docker ps` |
-| gke-gcloud-auth-plugin | Not on PATH (warning: only kubectl needs it) | `gcloud components install gke-gcloud-auth-plugin` |
+| gke-gcloud-auth-plugin | Not on PATH (warning: only kubectl and the readiness check need it; tuggy runs it with `--use_application_default_credentials`) | `gcloud components install gke-gcloud-auth-plugin` |
 | Google credentials | No ADC file, unreadable, or unsupported type | `gcloud auth application-default login` |
 | Google sign-in | Credentials can't produce an access token (expired, revoked) | `gcloud auth application-default login` |
 | Impersonate *sa* (if set) | Caller can't impersonate the service account | Grant `roles/iam.serviceAccountTokenCreator` on it |
@@ -479,8 +479,11 @@ The demo's nginx deployment is not part of the module.
 ## Kubeconfig
 
 - Each platform builds its entry from its outputs, including the exec auth plugin (`gke-gcloud-auth-plugin` for GKE; `aws eks get-token` for EKS later). `doctor` checks the plugin is installed on the host.
-- Merged with `client-go/tools/clientcmd`, preserving all other entries. Context name is `tuggy-<name>`, overridable with `--context-name`.
-- `create` merges and switches context by default. `delete` removes only the entries tuggy added.
+- Changes go through client-go's `clientcmd.ModifyConfig`, the function `kubectl config` uses: it honours `KUBECONFIG` (including lists of files, writing new entries to the first existing one), locks while writing, and keeps files owner-only.
+- Every cluster, user and context tuggy writes is named `tuggy-<name>`; tuggy refuses to add or remove entries with other names, so the user's own entries are never touched. Re-creating a cluster replaces its `tuggy-` entries.
+- `create` merges and switches context by default. `delete` removes the context and, unless another context still uses them, its cluster and user; if it was the current context, none is current afterwards.
+- **Readiness (R4):** after `create`, tuggy connects exactly as kubectl would (same exec plugin) and waits for `/readyz` to answer `ok`, then reads `/version`, retrying every 5s for up to 2 minutes. The cluster's CA certificate is always verified. Rejected credentials are reported plainly ("the cluster rejected the credentials (Unauthorized)").
+- **One Google sign-in for GKE:** by default `gke-gcloud-auth-plugin` uses the gcloud CLI sign-in (`gcloud auth login`), which is separate from the Application Default Credentials (ADC) OpenTofu uses and expires independently. tuggy writes the plugin with `--use_application_default_credentials`, so kubectl and the readiness check use ADC too and users keep only `gcloud auth application-default login` fresh. When a cluster was built by impersonating a service account, kubectl connects as the user's own ADC identity, which needs GKE access in the project (for example `roles/container.developer`).
 
 ## Add-ons (phase 3, outline only)
 
