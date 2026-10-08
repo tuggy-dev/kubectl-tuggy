@@ -11,18 +11,29 @@ import (
 // Run executes kubectl-tuggy with args and returns the process exit code.
 // Errors are printed once here; commands only return them.
 func Run(ctx context.Context, args []string, streams IOStreams) int {
-	root := NewRootCommand(streams)
+	app, err := newApp(streams)
+	if err != nil {
+		fmt.Fprintf(streams.ErrOut, "Error: %v\n", err)
+		return ExitError
+	}
+	return app.Run(ctx, args)
+}
+
+// Run executes kubectl-tuggy with args using the app's dependencies.
+func (a *App) Run(ctx context.Context, args []string) int {
+	root := NewRootCommand(a)
 	root.SetArgs(args)
 
 	err := root.ExecuteContext(ctx)
 	if err != nil {
-		fmt.Fprintf(streams.ErrOut, "Error: %v\n", err)
+		fmt.Fprintf(a.Streams.ErrOut, "Error: %v\n", err)
 	}
 	return ExitCodeFor(err)
 }
 
 // NewRootCommand builds the full command tree.
-func NewRootCommand(streams IOStreams) *cobra.Command {
+func NewRootCommand(app *App) *cobra.Command {
+	streams := app.Streams
 	root := &cobra.Command{
 		Use:   "tuggy",
 		Short: "Your Kubernetes sidekick",
@@ -43,6 +54,15 @@ starting with creating and deleting clusters.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
+		// After every command that works with clusters, mention any that
+		// have passed their TTL, so forgotten clusters don't keep costing.
+		PersistentPostRun: func(cmd *cobra.Command, _ []string) {
+			switch cmd.Name() {
+			case "version", "help", "completion", "tuggy":
+				return
+			}
+			app.warnExpired()
+		},
 	}
 	root.SetIn(streams.In)
 	root.SetOut(streams.Out)
@@ -50,7 +70,14 @@ starting with creating and deleting clusters.`,
 
 	root.SetFlagErrorFunc(usageError)
 
-	root.AddCommand(newVersionCommand(streams))
+	root.AddCommand(
+		newCreateCommand(app),
+		newGetCommand(app),
+		newDescribeCommand(app),
+		newDeleteCommand(app),
+		newDoctorCommand(app),
+		newVersionCommand(streams),
+	)
 	return root
 }
 

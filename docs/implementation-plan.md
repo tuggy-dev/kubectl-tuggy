@@ -141,6 +141,8 @@ flowchart LR
 - Resume: `create` on a `Failed` record re-applies.
 - `~/.tuggy/config.yaml` for defaults (project, location, TTL, image).
 
+Implemented in `internal/cli` around an `App` holding every dependency (store, platform registry, kubeconfig manager, readiness check, clock, terminal detection), so commands are tested with fakes. Checked by hand against the real `development-499904` project: `doctor` and `create cluster --dry-run` pass through `kubectl tuggy`.
+
 **Done when:** command tests run against fake platform and runner, covering confirmation, `--yes`, resume, and every exit code. Each of the 13 demo defects in the design has a test proving it is fixed.
 
 ### 1.11 End-to-end, docs, release

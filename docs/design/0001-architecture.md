@@ -97,6 +97,9 @@ kubectl tuggy version
 ### Conventions
 
 - Verb-noun grammar like kubectl. Cluster name is a positional argument.
+- `--platform` can be left out while only one platform is built in.
+- Settings that describe the cluster (`--ttl`, `--node-count`, platform flags such as `--project`) can't be combined with `-f`; they belong in the file.
+- `doctor` takes the same flags as `create cluster`; the location can be left out because the checks don't depend on it.
 - Destructive commands show what will be removed and ask to confirm. `--yes` skips the prompt. If there is no terminal and no `--yes`, the command fails instead of proceeding.
 - Any failure exits non-zero, with a short explanation and the path to the full log.
 - Long operations show progress (resource being created, elapsed time), not raw OpenTofu output. `-v` streams the raw output.

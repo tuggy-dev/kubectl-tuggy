@@ -87,8 +87,12 @@ func (f *Fake) Preflight(context.Context, *platform.Plan) []platform.CheckResult
 	return f.Checks
 }
 
-// Create returns the configured outputs or error.
-func (f *Fake) Create(ctx context.Context, p *platform.Plan, _ platform.CreateOptions) (*platform.ClusterInfo, error) {
+// Planned is what the fake reports it would build or remove.
+var Planned = []platform.ResourceChange{{Address: "fake_cluster.this", Type: "fake_cluster"}}
+
+// Create returns the configured outputs or error. A dry run returns the
+// planned changes instead.
+func (f *Fake) Create(ctx context.Context, p *platform.Plan, opts platform.CreateOptions) (*platform.ClusterInfo, error) {
 	f.record("Create")
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -96,16 +100,43 @@ func (f *Fake) Create(ctx context.Context, p *platform.Plan, _ platform.CreateOp
 	if f.CreateErr != nil {
 		return nil, f.CreateErr
 	}
+	if opts.DryRun {
+		return &platform.ClusterInfo{Name: p.Name, Platform: f.PlatformName, Changes: changes("create")}, nil
+	}
 	return &platform.ClusterInfo{Name: p.Name, Platform: f.PlatformName, Outputs: f.Outputs}, nil
 }
 
-// Delete returns the configured error.
-func (f *Fake) Delete(ctx context.Context, _ *clustermeta.Record, _ platform.DeleteOptions) error {
+// Delete asks for confirmation like a real platform, then returns the
+// configured error.
+func (f *Fake) Delete(ctx context.Context, _ *clustermeta.Record, opts platform.DeleteOptions) error {
 	f.record("Delete")
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if opts.Confirm != nil {
+		if err := opts.Confirm(*changes("delete")); err != nil {
+			return err
+		}
+	}
+	if opts.DryRun {
+		return nil
+	}
+	f.record("Delete:removed")
 	return f.DeleteErr
+}
+
+func changes(action string) *platform.Changes {
+	c := &platform.Changes{}
+	for _, r := range Planned {
+		r.Action = action
+		c.Resources = append(c.Resources, r)
+	}
+	if action == "delete" {
+		c.Remove = len(c.Resources)
+	} else {
+		c.Add = len(c.Resources)
+	}
+	return c
 }
 
 // Describe returns basic details from the record.
@@ -114,13 +145,16 @@ func (f *Fake) Describe(_ context.Context, rec *clustermeta.Record, _ string) (*
 	return &platform.ClusterInfo{Name: rec.Name, Platform: f.PlatformName, Location: "fake-location", Outputs: rec.Outputs}, nil
 }
 
-// Kubeconfig returns a minimal kubeconfig pointing at the record's endpoint.
+// Kubeconfig returns a minimal kubeconfig pointing at the record's
+// endpoint, named like a real platform's entries.
 func (f *Fake) Kubeconfig(_ context.Context, rec *clustermeta.Record) (*clientcmdapi.Config, error) {
 	f.record("Kubeconfig")
+	name := "tuggy-" + rec.Name
 	cfg := clientcmdapi.NewConfig()
-	cfg.Clusters[rec.Name] = &clientcmdapi.Cluster{Server: rec.Outputs["endpoint"]}
-	cfg.AuthInfos[rec.Name] = &clientcmdapi.AuthInfo{}
-	cfg.Contexts[rec.Name] = &clientcmdapi.Context{Cluster: rec.Name, AuthInfo: rec.Name}
+	cfg.Clusters[name] = &clientcmdapi.Cluster{Server: rec.Outputs["endpoint"]}
+	cfg.AuthInfos[name] = &clientcmdapi.AuthInfo{Token: "fake"}
+	cfg.Contexts[name] = &clientcmdapi.Context{Cluster: name, AuthInfo: name}
+	cfg.CurrentContext = name
 	return cfg, nil
 }
 

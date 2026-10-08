@@ -142,7 +142,7 @@ func TestLifecycleThroughInterface(t *testing.T) {
 		t.Errorf("saved record = %+v", saved)
 	}
 	kc, err := p.Kubeconfig(ctx, saved)
-	if err != nil || kc.Clusters["dev"].Server != saved.Outputs["endpoint"] {
+	if err != nil || kc.Clusters["tuggy-dev"].Server != saved.Outputs["endpoint"] {
 		t.Errorf("kubeconfig = %+v, %v", kc, err)
 	}
 
