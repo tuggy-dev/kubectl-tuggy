@@ -10,7 +10,7 @@ kubectl tuggy get clusters
 kubectl tuggy delete cluster dev
 ```
 
-> **Status: early development.** Nothing is released yet. See the [architecture and plan](docs/design/0001-architecture.md) for what's coming.
+> **Status: early development.** Nothing is released yet. See the [architecture](docs/architecture.md) for how it's built, and the [design](docs/design/0001-architecture.md) and [plan](docs/implementation-plan.md) for what's coming.
 
 ## Planned features
 
