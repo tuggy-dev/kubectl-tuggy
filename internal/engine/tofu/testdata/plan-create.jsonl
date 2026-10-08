@@ -1,0 +1,4 @@
+{"@level":"info","@message":"OpenTofu 1.13.1","@module":"tofu.ui","@timestamp":"2026-10-07T22:23:17.805529Z","tofu":"1.13.1","type":"version","ui":"1.2"}
+{"@level":"info","@message":"random_pet.this: Plan to create","@module":"tofu.ui","@timestamp":"2026-10-07T22:23:17.877880Z","change":{"resource":{"addr":"random_pet.this","module":"","resource":"random_pet.this","implied_provider":"random","resource_type":"random_pet","resource_name":"this","resource_key":null},"action":"create"},"type":"planned_change"}
+{"@level":"info","@message":"Plan: 1 to add, 0 to change, 0 to destroy.","@module":"tofu.ui","@timestamp":"2026-10-07T22:23:17.877939Z","changes":{"add":1,"change":0,"import":0,"remove":0,"forget":0,"operation":"plan"},"type":"change_summary"}
+{"@level":"info","@message":"Outputs: 2","@module":"tofu.ui","@timestamp":"2026-10-07T22:23:17.877949Z","outputs":{"name":{"sensitive":false,"action":"create"},"pet":{"sensitive":false,"action":"create"}},"type":"outputs"}

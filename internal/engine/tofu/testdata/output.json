@@ -1,0 +1,12 @@
+{
+  "name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "dev"
+  },
+  "pet": {
+    "sensitive": false,
+    "type": "string",
+    "value": "dev-enormous-octopus"
+  }
+}

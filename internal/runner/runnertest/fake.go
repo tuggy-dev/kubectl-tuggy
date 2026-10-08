@@ -28,6 +28,10 @@ type Fake struct {
 	PingErr  error
 	ImageErr error
 
+	// BeforeRun, if set, is called with each spec before its result is
+	// returned, for example to create files the real command would write.
+	BeforeRun func(runner.Spec)
+
 	mu      sync.Mutex
 	results []Result
 	specs   []runner.Spec
@@ -81,6 +85,9 @@ func (f *Fake) Run(ctx context.Context, spec runner.Spec) (int, error) {
 	}
 	f.mu.Unlock()
 
+	if f.BeforeRun != nil {
+		f.BeforeRun(spec)
+	}
 	write(spec.Stdout, r.Stdout)
 	write(spec.Stderr, r.Stderr)
 

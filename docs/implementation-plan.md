@@ -98,7 +98,7 @@ flowchart LR
 
 ### 1.6 OpenTofu engine
 
-- `internal/engine/tofu`: write the embedded module and `terraform.tfvars.json` into the workspace; run `init`, `plan -out`, `apply <plan>`, `plan -destroy`, `output -json` through the runner.
+- `internal/engine/tofu`: write the embedded module and `tuggy.tfvars.json` into the workspace; pass variables as `TF_VAR_` environment variables; run `init`, `plan -out`, `apply <plan>`, `plan -destroy`, `output -json` through the runner; shared provider cache in `~/.tuggy/cache/plugins`.
 - Parse OpenTofu `-json` events into progress updates (resource started, completed, failed, elapsed time) and a plan summary.
 - Full output to `logs/<timestamp>-<action>.log`.
 
