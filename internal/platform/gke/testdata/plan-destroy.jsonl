@@ -1,0 +1,3 @@
+{"@level":"info","@message":"google_container_node_pool.this[\"default\"]: Plan to delete","change":{"resource":{"addr":"google_container_node_pool.this[\"default\"]","resource_type":"google_container_node_pool"},"action":"delete"},"type":"planned_change"}
+{"@level":"info","@message":"google_container_cluster.this: Plan to delete","change":{"resource":{"addr":"google_container_cluster.this","resource_type":"google_container_cluster"},"action":"delete"},"type":"planned_change"}
+{"@level":"info","@message":"Plan: 0 to add, 0 to change, 2 to destroy.","changes":{"add":0,"change":0,"import":0,"remove":2,"operation":"plan"},"type":"change_summary"}

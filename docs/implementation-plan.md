@@ -117,6 +117,7 @@ flowchart LR
 - `internal/platform/gke`: config type decoded from `platformConfig`, validation, platform-specific flags (`--project`, `--location`) via `FlagBinder`.
 - `gke.Variables`, a typed struct mirroring the module's `variables.tf`, and `FromV1Alpha1` translating the spec into it. A contract test checks the struct and the module's declared variables match exactly.
 - `Describe`, reading location and node pools back from the cluster's variables file.
+- `Create`, `Delete` (with a confirmation callback) and `Kubeconfig` (exec auth through `gke-gcloud-auth-plugin`), tested with the fake runner; a contract test plans the real module in the OpenTofu container with Go-generated variables and a mock Google provider.
 - Google ADC discovery (env var, gcloud file on each OS), returning the single file to mount and the account email.
 - GKE preflight using Google's Go SDK: credentials valid, required permissions present (`testIamPermissions` on the project), Kubernetes Engine API enabled. Each failure has a fix hint.
 - Shared checks: container runtime reachable, image available or pullable, `gke-gcloud-auth-plugin` on PATH.

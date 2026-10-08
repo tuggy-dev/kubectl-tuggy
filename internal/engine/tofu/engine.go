@@ -294,11 +294,11 @@ func removePlan(dir, file string) error {
 	return err
 }
 
-// variablesEnv reads the workspace's variables file and returns one TF_VAR_
+// VariablesEnv reads the workspace's variables file and returns one TF_VAR_
 // environment variable per value. Strings are passed as they are; other
 // values as JSON, which OpenTofu parses for lists, objects, numbers and bools.
 // Null values are left out so the module's default applies.
-func variablesEnv(dir string) (map[string]string, error) {
+func VariablesEnv(dir string) (map[string]string, error) {
 	data, err := os.ReadFile(filepath.Join(dir, VariablesFile)) // #nosec G304 -- the cluster's own workspace
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -416,7 +416,7 @@ func (e *Engine) spec(ws Workspace, args []string) (runner.Spec, error) {
 		mounts = append(mounts, runner.Mount{Type: runner.MountBind, Source: e.PluginCacheDir, Target: pluginCacheMount})
 		env["TF_PLUGIN_CACHE_DIR"] = pluginCacheMount
 	}
-	vars, err := variablesEnv(ws.Dir)
+	vars, err := VariablesEnv(ws.Dir)
 	if err != nil {
 		return runner.Spec{}, err
 	}

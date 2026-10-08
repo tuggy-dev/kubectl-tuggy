@@ -8,11 +8,13 @@ require (
 	github.com/moby/moby/client v0.6.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
+	golang.org/x/oauth2 v0.37.0
 	k8s.io/client-go v0.37.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect

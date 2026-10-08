@@ -222,7 +222,7 @@ type Platform interface {
     Delete(ctx context.Context, rec *clustermeta.Record, opts DeleteOptions) error
 
     // Describe reports the cluster's details (location, node pools, version)
-    // from the platform's own files, such as its variables file.
+    // from the platform's own files in dir, such as its variables file.
     Describe(ctx context.Context, rec *clustermeta.Record, dir string) (*ClusterInfo, error)
 
     // Kubeconfig returns the cluster, user (with exec auth plugin) and context entries to merge.
@@ -254,6 +254,8 @@ What happens behind each method differs per platform:
 | `Preflight` | Google credentials, IAM, Docker | SSH access to each machine | AWS credentials, quotas |
 | `Create` | Writes module + variables file, runs OpenTofu | Installs Kubernetes over SSH (no OpenTofu) | Writes its module + variables file, runs OpenTofu |
 | `Kubeconfig` | `gke-gcloud-auth-plugin` | Admin config from the server | `aws eks get-token` |
+
+`CreateOptions` and `DeleteOptions` carry the cluster's directory, the shared cache directory, `DryRun`, a log writer, and an `OnProgress` callback for live progress (resource started, still running, done, failed). `DeleteOptions.Confirm` is called with the planned removals before anything is removed, so the CLI can ask the user; a dry-run `Create` returns the planned changes in `ClusterInfo.Changes`.
 
 Rules that keep platforms pluggable:
 
@@ -397,7 +399,19 @@ Reads every record for name, platform, status, age, and expiry, and asks each re
 
 ### doctor
 
-Runs every platform's preflight checks and prints pass/fail with a fix for each failure, for example "Run `gcloud auth application-default login`".
+Runs every platform's preflight checks and prints pass/fail with a fix for each failure, for example "Run `gcloud auth application-default login`". The same checks run at the start of `create`, before anything is built (R5).
+
+GKE checks, in order (later checks are skipped when one they depend on fails):
+
+| Check | Fails or warns when | Fix shown |
+|---|---|---|
+| Container engine | Docker API not reachable | Start Docker Desktop, Colima, …; check `docker ps` |
+| gke-gcloud-auth-plugin | Not on PATH (warning: only kubectl needs it) | `gcloud components install gke-gcloud-auth-plugin` |
+| Google credentials | No ADC file, unreadable, or unsupported type | `gcloud auth application-default login` |
+| Google sign-in | Credentials can't produce an access token (expired, revoked) | `gcloud auth application-default login` |
+| Impersonate *sa* (if set) | Caller can't impersonate the service account | Grant `roles/iam.serviceAccountTokenCreator` on it |
+| Kubernetes Engine API | `container.googleapis.com` disabled (warning if it can't be read) | `gcloud services enable container.googleapis.com --project P` |
+| Permissions | Missing any of `container.clusters.{create,get,update,delete}`, `container.operations.get`, `iam.serviceAccounts.actAs` (checked as the impersonated account when set) | Grant `roles/container.admin` and `roles/iam.serviceAccountUser` |
 
 ## OpenTofu engine and container runner
 
@@ -527,7 +541,7 @@ docs/  hack/  .github/workflows/
 ## Open questions
 
 1. **Bare metal approach.** k3s over SSH, kubeadm over SSH, or Talos. Decide before phase 2.
-2. **GKE defaults.** Zonal (cheaper, demo default) vs regional. Default machine type (`e2-small` as in the demo is very small; `e2-standard-2` proposed). Autopilot as an option?
+2. **GKE defaults.** Decided for v0.1: no default location (the user picks a zone or region), default machine type `e2-standard-2`, release channel `REGULAR`, network `default`. Still open: Autopilot as an option?
 3. **Default TTL.** Should clusters expire by default (for example 24h) unless `--ttl 0`? Safer for cost, but surprising for long-lived clusters.
 4. **Network.** Use the project's `default` network in v0.1, or create a dedicated VPC per cluster?
 5. **Impersonation.** The demo impersonates an `opentofu@` service account. Keep it as an optional input, or recommend it as the default setup?

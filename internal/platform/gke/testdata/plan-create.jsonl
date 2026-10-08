@@ -1,0 +1,4 @@
+{"@level":"info","@message":"OpenTofu 1.13.1","type":"version","tofu":"1.13.1","ui":"1.2"}
+{"@level":"info","@message":"google_container_cluster.this: Plan to create","change":{"resource":{"addr":"google_container_cluster.this","resource_type":"google_container_cluster","resource_name":"this"},"action":"create"},"type":"planned_change"}
+{"@level":"info","@message":"google_container_node_pool.this[\"default\"]: Plan to create","change":{"resource":{"addr":"google_container_node_pool.this[\"default\"]","resource_type":"google_container_node_pool","resource_name":"this"},"action":"create"},"type":"planned_change"}
+{"@level":"info","@message":"Plan: 2 to add, 0 to change, 0 to destroy.","changes":{"add":2,"change":0,"import":0,"remove":0,"operation":"plan"},"type":"change_summary"}

@@ -92,11 +92,19 @@ type CreateOptions struct {
 	// Dir is the cluster's directory, where the platform keeps its files.
 	Dir string
 
-	// DryRun shows what would be built without changing anything.
+	// CacheDir is a directory shared by all clusters for downloads, such as
+	// OpenTofu providers. Empty disables caching.
+	CacheDir string
+
+	// DryRun plans the cluster and reports the planned changes in
+	// ClusterInfo.Changes without building anything.
 	DryRun bool
 
 	// Log receives the full output of the operation.
 	Log io.Writer
+
+	// OnProgress, if set, receives progress as resources are created.
+	OnProgress func(Progress)
 }
 
 // DeleteOptions control Delete.
@@ -104,11 +112,63 @@ type DeleteOptions struct {
 	// Dir is the cluster's directory.
 	Dir string
 
-	// DryRun shows what would be removed without changing anything.
+	// CacheDir is the shared download directory; see CreateOptions.
+	CacheDir string
+
+	// DryRun reports what would be removed without removing anything.
 	DryRun bool
+
+	// Confirm, if set, is called with what will be removed before anything
+	// is. Returning an error stops the delete with that error.
+	Confirm func(Changes) error
 
 	// Log receives the full output of the operation.
 	Log io.Writer
+
+	// OnProgress, if set, receives progress as resources are removed.
+	OnProgress func(Progress)
+}
+
+// Changes summarizes what an operation will change.
+type Changes struct {
+	Add    int
+	Change int
+	Remove int
+
+	// Resources lists each resource change.
+	Resources []ResourceChange
+}
+
+// ResourceChange is one planned change.
+type ResourceChange struct {
+	// Address identifies the resource, for example "google_container_cluster.this".
+	Address string
+	// Type is the kind of resource, for example "google_container_cluster".
+	Type string
+	// Action is create, update, delete, replace or read.
+	Action string
+}
+
+// ProgressKind says what a Progress update reports.
+type ProgressKind string
+
+// Progress kinds.
+const (
+	ProgressStarted ProgressKind = "started" // a resource change started
+	ProgressRunning ProgressKind = "running" // still in progress
+	ProgressDone    ProgressKind = "done"    // finished
+	ProgressFailed  ProgressKind = "failed"  // failed
+	ProgressInfo    ProgressKind = "info"    // a step of the operation, such as "Planning"
+)
+
+// Progress is one update during a long operation.
+type Progress struct {
+	Kind         ProgressKind
+	Resource     string
+	ResourceType string
+	Action       string
+	Elapsed      time.Duration
+	Message      string
 }
 
 // ListOptions control ListRemote.
@@ -125,6 +185,9 @@ type ClusterInfo struct {
 	// Outputs are values known only after creation, such as the API
 	// endpoint. Create's outputs are saved in the cluster's record.
 	Outputs map[string]string
+
+	// Changes is set by a dry-run Create: what would be built.
+	Changes *Changes
 }
 
 // NodePoolInfo describes one node pool.
