@@ -108,7 +108,7 @@ flowchart LR
 
 - `internal/platform/gke/module`: cluster with default pool removed, node pools from a list, Workload Identity, release channel, labels (`managed-by`, `tuggy-cluster`, `tuggy-expires-at`), optional impersonation. Outputs: name, location, project, endpoint, CA, version.
 - Embedded with `go:embed` from inside the gke package, so the module ships with its platform.
-- CI: `tofu fmt -check`, `tofu validate`, and `tofu test` with mocked OpenTofu providers.
+- `tofu fmt -check`, `tofu validate` against the real Google provider, and `tofu test` with a mock Google provider, run by a Go test in the pinned OpenTofu container (so `go test` and CI cover the module).
 
 **Done when:** module tests pass in CI and a manual apply in the sandbox project works.
 

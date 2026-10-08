@@ -442,11 +442,15 @@ Only the single credentials file is mounted, not the whole gcloud folder.
 
 **Variables** (mirrored by `gke.Variables`): `name`, `project`, `location`, `release_channel`, `kubernetes_version` (optional), `network`, `subnetwork`, `node_pools` (list of name, machine type, count, spot, disk size), `labels`, `impersonate_service_account` (optional), `deletion_protection` (default false for v0.1).
 
-**Resources:** `google_container_cluster` with the default node pool removed (as in the demo), Workload Identity enabled, labels applied. One `google_container_node_pool` per entry in `node_pools`.
+**Resources:** `google_container_cluster` with the default node pool removed (as in the demo), Workload Identity enabled, and legacy client certificates turned off (users sign in with their Google identity). One `google_container_node_pool` per entry in `node_pools`, with auto-repair and auto-upgrade on.
+
+**Provider:** `hashicorp/google ~> 8.6`, pinned with checksums in the module's `.terraform.lock.hcl` for linux/amd64 and linux/arm64 (where OpenTofu runs in the container).
 
 **Outputs:** `name`, `location`, `project`, `endpoint`, `ca_certificate`, `kubernetes_version`.
 
-**Labels on every resource:** `managed-by=tuggy`, `tuggy-cluster=<name>`, and `tuggy-expires-at=<unix time>` when a TTL is set. These let `get clusters --all` and cost reports identify tuggy clusters.
+**Labels on every resource:** `managed-by=tuggy`, `tuggy-cluster=<name>`, and `tuggy-expires-at=<unix time>` when a TTL is set, through the provider's `default_labels` and on the node VMs. These let `get clusters --all` and cost reports identify tuggy clusters.
+
+**Tests:** `tests/gke.tftest.hcl` runs with a mock Google provider (no account needed): cluster and pool settings, outputs, labels, and rejection of invalid input. A Go test runs `fmt`, `validate` and `tofu test` in the pinned OpenTofu container.
 
 The demo's nginx deployment is not part of the module.
 
