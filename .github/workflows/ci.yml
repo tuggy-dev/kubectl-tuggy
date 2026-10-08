@@ -42,12 +42,14 @@ jobs:
         run: go test -race ./...
       - name: Build
         run: go build -o bin/ ./cmd/kubectl-tuggy
+      # macOS runners don't include kubectl; install it everywhere so all
+      # three operating systems run the same check.
+      - uses: azure/setup-kubectl@v5
       - name: Smoke test as a kubectl plugin
         shell: bash
         run: |
           export PATH="$PWD/bin:$PATH"
-          # kubectl plugin list exits non-zero when it warns about other
-          # plugins on the runner, so show it without failing on it.
+          # Informational: plugin list also reports unrelated plugins.
           kubectl plugin list || true
-          # This is the real check: kubectl finds and runs the plugin.
+          # The check: kubectl finds and runs the plugin.
           kubectl tuggy version
