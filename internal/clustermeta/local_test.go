@@ -240,8 +240,13 @@ func TestLockExclusiveWithinProcess(t *testing.T) {
 	if _, err := s.Lock("dev"); !errors.Is(err, ErrLocked) {
 		t.Errorf("second Lock: %v, want ErrLocked", err)
 	}
-	if _, err := s.Lock("other"); err != nil {
+	unlockOther, err := s.Lock("other")
+	if err != nil {
 		t.Errorf("Lock of a different cluster should succeed: %v", err)
+	} else {
+		// Release it: Windows can't remove the test's temporary folder while
+		// the lock file is open.
+		t.Cleanup(func() { _ = unlockOther() })
 	}
 	if err := unlock(); err != nil {
 		t.Fatal(err)
