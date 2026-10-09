@@ -100,7 +100,7 @@ func TestWaitReadyTimesOut(t *testing.T) {
 
 func TestWaitReadyUnauthorized(t *testing.T) {
 	srv, _ := fakeAPIServer(t, 0, "good")
-	_, err := WaitReady(context.Background(), configFor(srv, "wrong"), ReadyOptions{Timeout: 200 * time.Millisecond, Interval: 50 * time.Millisecond})
+	_, err := WaitReady(context.Background(), configFor(srv, "wrong"), ReadyOptions{Timeout: 2 * time.Second, Interval: 50 * time.Millisecond})
 	if err == nil || !strings.Contains(err.Error(), "rejected the credentials (Unauthorized)") {
 		t.Errorf("err = %v, want the authorization failure explained", err)
 	}
@@ -121,7 +121,7 @@ func TestWaitReadyRejectsUnknownCA(t *testing.T) {
 	cfg := configFor(srv, "good")
 	cfg.Clusters["tuggy-dev"].CertificateAuthorityData = otherCA(t)
 
-	_, err := WaitReady(context.Background(), cfg, ReadyOptions{Timeout: 200 * time.Millisecond, Interval: 50 * time.Millisecond})
+	_, err := WaitReady(context.Background(), cfg, ReadyOptions{Timeout: 2 * time.Second, Interval: 50 * time.Millisecond})
 	if err == nil || !strings.Contains(err.Error(), "certificate") {
 		t.Errorf("err = %v, want a certificate error: the CA from the cluster must be checked", err)
 	}
@@ -149,4 +149,25 @@ func otherCA(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+}
+
+// TestWaitReadyKeepsCauseWhenDeadlineCutsAttempt reproduces a slow machine:
+// the overall deadline expires during a retry. The error must still name the
+// real cause from the earlier attempt, not just "deadline exceeded".
+func TestWaitReadyKeepsCauseWhenDeadlineCutsAttempt(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("[-]etcd failed: not ready yet"))
+			return
+		}
+		time.Sleep(2 * time.Second) // later attempts outlast the deadline
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := WaitReady(context.Background(), configFor(srv, "good"), ReadyOptions{Timeout: 500 * time.Millisecond, Interval: 10 * time.Millisecond})
+	if err == nil || !strings.Contains(err.Error(), "unable to handle the request") || strings.Contains(err.Error(), "deadline exceeded") {
+		t.Errorf("err = %v, want the earlier attempt's cause rather than the deadline", err)
+	}
 }

@@ -57,7 +57,12 @@ func WaitReady(ctx context.Context, cfg *clientcmdapi.Config, opts ReadyOptions)
 		if err == nil {
 			return version, nil
 		}
-		lastErr = err
+		// An attempt cut short by the overall deadline only says time ran
+		// out; keep the earlier attempt's error, which says why the cluster
+		// isn't answering (for example an untrusted certificate).
+		if lastErr == nil || ctx.Err() == nil {
+			lastErr = err
+		}
 		if opts.OnAttempt != nil {
 			opts.OnAttempt(attempt, err)
 		}
