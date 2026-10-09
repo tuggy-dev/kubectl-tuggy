@@ -536,3 +536,49 @@ func writeFile(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestCreateShowsNextSteps(t *testing.T) {
+	e := newEnv(t)
+	writeFile(t, e.kubeconfig, `apiVersion: v1
+kind: Config
+current-context: work
+clusters: [{name: work, cluster: {server: "https://work.example.com"}}]
+users: [{name: work, user: {token: x}}]
+contexts: [{name: work, context: {cluster: work, user: work}}]
+`)
+	code, out, _ := e.run(t, "create", "cluster", "dev", "--ttl", "8h")
+	if code != ExitOK {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	steps := out[strings.Index(out, "Next steps:"):]
+	for _, want := range []string{
+		"kubectl get nodes",
+		"kubectl config use-context tuggy-dev",
+		"kubectl config use-context work",
+		"# switch back to the cluster you used before",
+		"kubectl tuggy describe cluster dev",
+		"kubectl tuggy delete cluster dev",
+		"(it expires in 8h0m)",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("next steps missing %q:\n%s", want, steps)
+		}
+	}
+	t.Logf("\n%s", out[strings.Index(out, "Cluster dev is ready"):])
+}
+
+func TestCreateNextStepsWithoutKubeconfig(t *testing.T) {
+	e := newEnv(t)
+	code, out, _ := e.run(t, "create", "cluster", "dev", "--no-kubeconfig")
+	if code != ExitOK {
+		t.Fatalf("exit %d", code)
+	}
+	steps := out[strings.Index(out, "Next steps:"):]
+	if !strings.Contains(steps, "kubectl tuggy get kubeconfig dev --merge") || strings.Contains(steps, "use-context") {
+		t.Errorf("without a kubeconfig entry, the first step should add one:\n%s", steps)
+	}
+	if !strings.Contains(steps, "# delete it when you're done\n") {
+		t.Errorf("no TTL: the delete step shouldn't mention expiry:\n%s", steps)
+	}
+	t.Logf("\n%s", steps)
+}

@@ -147,10 +147,16 @@ Checking gke prerequisites for cluster dev
   ✓ kubeconfig updated; current context is now "tuggy-dev"
 
 Cluster dev is ready (created in 11m2s). It expires in 1h48m.
-Delete it with: kubectl tuggy delete cluster dev
+
+Next steps:
+  kubectl get nodes                      # kubectl is already using the cluster
+  kubectl config use-context tuggy-dev   # switch back to this cluster later
+  kubectl config use-context work        # switch back to the cluster you used before
+  kubectl tuggy describe cluster dev     # see its details
+  kubectl tuggy delete cluster dev       # delete it when you're done (it expires in 1h48m)
 ```
 
-Building a GKE cluster takes about 10 minutes. tuggy only says "ready" once the cluster actually answers, and it has already switched kubectl to it.
+Building a GKE cluster takes about 10 minutes. tuggy only says "ready" once the cluster actually answers, and it has already switched kubectl to it. The **Next steps** show how to switch between this cluster and the one you were using before (`work` here) with kubectl contexts.
 
 **If it's interrupted** (Ctrl-C, closed laptop, network error): run the **same command again**. tuggy picks up where it left off instead of creating a second cluster.
 
@@ -179,7 +185,14 @@ dev    gke        us-central1-a   Ready    14m5s   1h45m
 kubectl tuggy describe cluster dev
 ```
 
-To switch back to another cluster, use kubectl as usual (`kubectl config use-context ...`). To add the tuggy cluster back to your kubeconfig later, or on another file:
+kubectl talks to one cluster at a time, its **current context**. tuggy names each cluster's context `tuggy-<name>`:
+
+```sh
+kubectl config get-contexts              # list them; * marks the current one
+kubectl config use-context tuggy-dev     # use the tuggy cluster
+```
+
+To add the tuggy cluster back to your kubeconfig later, or on another machine:
 
 ```sh
 kubectl tuggy get kubeconfig dev --merge     # add it and switch to it

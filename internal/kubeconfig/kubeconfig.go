@@ -39,6 +39,16 @@ func (m *Manager) Path() string {
 	return m.Access.GetDefaultFilename()
 }
 
+// CurrentContext returns the kubeconfig's current context, or "" if none is
+// set or the kubeconfig can't be read.
+func (m *Manager) CurrentContext() string {
+	cfg, err := m.Access.GetStartingConfig()
+	if err != nil {
+		return ""
+	}
+	return cfg.CurrentContext
+}
+
 // Merge adds or replaces the clusters, users and contexts in entries. Every
 // name must start with Prefix, so entries the user made are never touched.
 // With setCurrent, entries.CurrentContext becomes the current context.

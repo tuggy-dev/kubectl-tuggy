@@ -142,7 +142,8 @@ func (a *App) createCluster(cmd *cobra.Command, name string, opts createOptions)
 	rec.Outputs = info.Outputs
 	_ = a.Store.Update(rec)
 
-	if err := a.connect(ctx, p, rec, !opts.noKubeconfig); err != nil {
+	previous, err := a.connect(ctx, p, rec, !opts.noKubeconfig)
+	if err != nil {
 		return a.failCreate(rec, err, logFile.Name())
 	}
 
@@ -157,8 +158,46 @@ func (a *App) createCluster(cmd *cobra.Command, name string, opts createOptions)
 	if rec.ExpiresAt != nil {
 		a.printf(" It expires in %s.", shortDuration(rec.ExpiresAt.Sub(a.Now())))
 	}
-	a.printf("\nDelete it with: kubectl tuggy delete cluster %s\n", name)
+	a.printf("\n")
+	a.nextSteps(name, rec, !opts.noKubeconfig, previous)
 	return nil
+}
+
+// nextSteps tells the user how to reach and manage the new cluster, for
+// people who don't use kubectl contexts every day.
+func (a *App) nextSteps(name string, rec *clustermeta.Record, merged bool, previous string) {
+	ctxName := contextName(name)
+	type step struct{ cmd, why string }
+	var steps []step
+	if merged {
+		steps = append(steps,
+			step{"kubectl get nodes", "kubectl is already using the cluster"},
+			step{"kubectl config use-context " + ctxName, "switch back to this cluster later"},
+		)
+		if previous != "" && previous != ctxName {
+			steps = append(steps, step{"kubectl config use-context " + previous, "switch back to the cluster you used before"})
+		}
+	} else {
+		steps = append(steps,
+			step{"kubectl tuggy get kubeconfig " + name + " --merge", "add the cluster to your kubeconfig and switch to it"},
+			step{"kubectl get nodes", "then use it with kubectl"},
+		)
+	}
+	steps = append(steps, step{"kubectl tuggy describe cluster " + name, "see its details"})
+	done := "delete it when you're done"
+	if rec.ExpiresAt != nil {
+		done = "delete it when you're done (it expires in " + shortDuration(rec.ExpiresAt.Sub(a.Now())) + ")"
+	}
+	steps = append(steps, step{"kubectl tuggy delete cluster " + name, done})
+
+	width := 0
+	for _, s := range steps {
+		width = max(width, len(s.cmd))
+	}
+	a.printf("\nNext steps:\n")
+	for _, s := range steps {
+		a.printf("  %-*s   # %s\n", width, s.cmd, s.why)
+	}
 }
 
 // existingForCreate decides what to do about a cluster that already has a
@@ -225,26 +264,29 @@ func (a *App) dryRunCreate(ctx context.Context, p platform.Platform, plan *platf
 	return nil
 }
 
-// connect writes the kubeconfig entry and waits until the cluster answers.
-func (a *App) connect(ctx context.Context, p platform.Platform, rec *clustermeta.Record, merge bool) error {
+// connect waits until the cluster answers and, with merge, adds it to the
+// kubeconfig and switches to it. It returns the context that was current
+// before, so the user can be told how to switch back.
+func (a *App) connect(ctx context.Context, p platform.Platform, rec *clustermeta.Record, merge bool) (previous string, err error) {
 	cfg, err := p.Kubeconfig(ctx, rec)
 	if err != nil {
-		return err
+		return "", err
 	}
 	a.printf("• Waiting for the cluster to answer\n")
 	version, err := a.WaitReady(ctx, cfg, kubeconfig.ReadyOptions{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	a.printf("  ✓ cluster answers (Kubernetes %s)\n", version)
 
 	if merge {
+		previous = a.Kube.CurrentContext()
 		if err := a.Kube.Merge(cfg, true); err != nil {
-			return err
+			return "", err
 		}
 		a.printf("  ✓ kubeconfig updated; current context is now %q\n", cfg.CurrentContext)
 	}
-	return nil
+	return previous, nil
 }
 
 // failCreate marks the record Failed and explains how to continue.
