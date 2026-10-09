@@ -23,6 +23,20 @@ build:
 ## install: install kubectl-tuggy into GOBIN (or GOPATH/bin) so kubectl can find it
 install:
 	go install -trimpath -ldflags '$(LDFLAGS)' ./cmd/kubectl-tuggy
+	@dir="$$(go env GOBIN)"; \
+	[ -n "$$dir" ] || dir="$$(go env GOPATH | cut -d: -f1)/bin"; \
+	echo "Installed $(BINARY) to $$dir"; \
+	case ":$$PATH:" in \
+	  *":$$dir:"*) echo "Try it: kubectl tuggy version" ;; \
+	  *) echo ""; \
+	     echo "$$dir is not on your PATH, so kubectl can't find the plugin yet."; \
+	     echo "Add it for this terminal:"; \
+	     echo ""; \
+	     echo "  export PATH=\"\$$PATH:$$dir\""; \
+	     echo ""; \
+	     echo "To make it permanent, add that line to your shell profile (~/.bashrc, ~/.zshrc)."; \
+	     echo "Then check: kubectl tuggy version" ;; \
+	esac
 
 ## test: run unit tests with the race detector
 test:
