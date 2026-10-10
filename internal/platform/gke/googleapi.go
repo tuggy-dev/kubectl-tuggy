@@ -23,6 +23,7 @@ type googleAPI struct {
 	ResourceManagerURL string
 	ServiceUsageURL    string
 	IAMCredentialsURL  string
+	ContainerURL       string
 	HTTPClient         *http.Client
 
 	// TokenSource turns credentials into access tokens. Tests replace it.
@@ -34,6 +35,7 @@ func newGoogleAPI() *googleAPI {
 		ResourceManagerURL: "https://cloudresourcemanager.googleapis.com",
 		ServiceUsageURL:    "https://serviceusage.googleapis.com",
 		IAMCredentialsURL:  "https://iamcredentials.googleapis.com",
+		ContainerURL:       "https://container.googleapis.com",
 		HTTPClient:         &http.Client{Timeout: 30 * time.Second},
 		TokenSource:        googleTokenSource,
 	}
@@ -133,4 +135,58 @@ func (g *googleAPI) impersonate(ctx context.Context, token, serviceAccount strin
 	u := fmt.Sprintf("%s/v1/projects/-/serviceAccounts/%s:generateAccessToken", g.IAMCredentialsURL, url.PathEscape(serviceAccount))
 	err := g.call(ctx, token, http.MethodPost, u, map[string]any{"scope": []string{cloudPlatformScope}}, &out)
 	return out.AccessToken, err
+}
+
+// nodePoolNames lists the names of a GKE cluster's node pools.
+func (g *googleAPI) nodePoolNames(ctx context.Context, token, project, location, cluster string) ([]string, error) {
+	var out struct {
+		NodePools []struct {
+			Name string `json:"name"`
+		} `json:"nodePools"`
+	}
+	u := fmt.Sprintf("%s/v1/projects/%s/locations/%s/clusters/%s/nodePools", g.ContainerURL,
+		url.PathEscape(project), url.PathEscape(location), url.PathEscape(cluster))
+	if err := g.call(ctx, token, http.MethodGet, u, nil, &out); err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(out.NodePools))
+	for _, np := range out.NodePools {
+		names = append(names, np.Name)
+	}
+	return names, nil
+}
+
+// deleteNodePool starts deleting a node pool and returns the name of the
+// GKE operation doing it.
+func (g *googleAPI) deleteNodePool(ctx context.Context, token, project, location, cluster, pool string) (string, error) {
+	var out struct {
+		Name string `json:"name"`
+	}
+	u := fmt.Sprintf("%s/v1/projects/%s/locations/%s/clusters/%s/nodePools/%s", g.ContainerURL,
+		url.PathEscape(project), url.PathEscape(location), url.PathEscape(cluster), url.PathEscape(pool))
+	err := g.call(ctx, token, http.MethodDelete, u, nil, &out)
+	return out.Name, err
+}
+
+// operationDone reports whether a GKE operation has finished. A finished
+// operation that failed returns its error.
+func (g *googleAPI) operationDone(ctx context.Context, token, project, location, operation string) (bool, error) {
+	var out struct {
+		Status string `json:"status"`
+		Error  *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	u := fmt.Sprintf("%s/v1/projects/%s/locations/%s/operations/%s", g.ContainerURL,
+		url.PathEscape(project), url.PathEscape(location), url.PathEscape(operation))
+	if err := g.call(ctx, token, http.MethodGet, u, nil, &out); err != nil {
+		return false, err
+	}
+	if out.Status != "DONE" {
+		return false, nil
+	}
+	if out.Error != nil && out.Error.Message != "" {
+		return true, fmt.Errorf("GKE operation %s failed: %s", operation, out.Error.Message)
+	}
+	return true, nil
 }

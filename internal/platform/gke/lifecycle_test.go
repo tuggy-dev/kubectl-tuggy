@@ -45,6 +45,7 @@ type lifecycleHarness struct {
 	fake *runnertest.Fake
 	dir  string
 	log  *bytes.Buffer
+	gke  *fakeGKE
 }
 
 func newLifecycleHarness(t *testing.T, results ...runnertest.Result) *lifecycleHarness {
@@ -57,7 +58,9 @@ func newLifecycleHarness(t *testing.T, results ...runnertest.Result) *lifecycleH
 	p.NewRunner = func() (runner.Runner, error) { return fake, nil }
 	creds := writeCredentials(t, userCredentials)
 	p.CredentialsPath = func() string { return creds }
-	return &lifecycleHarness{p: p, fake: fake, dir: dir, log: &bytes.Buffer{}}
+	g := &fakeGKE{pools: []string{"default"}}
+	p.api = newFakeGKEAPI(t, g)
+	return &lifecycleHarness{p: p, fake: fake, dir: dir, log: &bytes.Buffer{}, gke: g}
 }
 
 func (h *lifecycleHarness) plan(t *testing.T) *platform.Plan {
