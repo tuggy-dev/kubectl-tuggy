@@ -64,6 +64,7 @@ spec:
     network: tuggy-vpc
     subnetwork: tuggy-subnet
     impersonateServiceAccount: opentofu@acme-prod.iam.gserviceaccount.com
+    nodeServiceAccount: gke-nodes@acme-prod.iam.gserviceaccount.com
 `
 
 func TestFromV1Alpha1Minimal(t *testing.T) {

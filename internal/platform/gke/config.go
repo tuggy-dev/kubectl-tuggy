@@ -29,6 +29,12 @@ type Config struct {
 	// ImpersonateServiceAccount is a service account email to act as, as the
 	// Sarayo demo did. Empty uses the caller's own credentials.
 	ImpersonateServiceAccount string `json:"impersonateServiceAccount,omitempty"`
+
+	// NodeServiceAccount is the service account email the node VMs run as.
+	// Nodes use it to pull images and write logs and metrics; workloads get
+	// their own identities through Workload Identity. Empty uses the
+	// project's default Compute Engine service account.
+	NodeServiceAccount string `json:"nodeServiceAccount,omitempty"`
 }
 
 // Defaults for settings the user left empty.
@@ -89,6 +95,9 @@ func (c Config) validate() error {
 	}
 	if c.ImpersonateServiceAccount != "" && !serviceAccount.MatchString(c.ImpersonateServiceAccount) {
 		add("impersonateServiceAccount", "%q is not a service account email (name@project.iam.gserviceaccount.com)", c.ImpersonateServiceAccount)
+	}
+	if c.NodeServiceAccount != "" && !serviceAccount.MatchString(c.NodeServiceAccount) {
+		add("nodeServiceAccount", "%q is not a service account email (name@project.iam.gserviceaccount.com)", c.NodeServiceAccount)
 	}
 
 	if len(errs) > 0 {

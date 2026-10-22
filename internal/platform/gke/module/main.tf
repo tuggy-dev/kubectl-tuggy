@@ -50,6 +50,11 @@ resource "google_container_node_pool" "this" {
     disk_size_gb = each.value.disk_size_gb
     oauth_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
 
+    # The nodes' Google identity, for pulling images and writing logs and
+    # metrics. Null keeps GKE's default: the Compute Engine default service
+    # account. Workloads use Workload Identity instead (below).
+    service_account = var.node_service_account
+
     # Label the node VMs too, so their cost is attributed to the cluster.
     resource_labels = var.labels
 

@@ -148,6 +148,7 @@ spec:
     releaseChannel: REGULAR
     network: default
     impersonateServiceAccount: "" # optional, as used in the demo
+    nodeServiceAccount: ""       # optional; empty = Compute Engine default service account
 ```
 
 Rules:
@@ -414,7 +415,8 @@ GKE checks, in order (later checks are skipped when one they depend on fails):
 | Google sign-in | Credentials can't produce an access token (expired, revoked) | `gcloud auth application-default login` |
 | Impersonate *sa* (if set) | Caller can't impersonate the service account | Grant `roles/iam.serviceAccountTokenCreator` on it |
 | Kubernetes Engine API | `container.googleapis.com` disabled (warning if it can't be read) | `gcloud services enable container.googleapis.com --project P` |
-| Permissions | Missing any of `container.clusters.{create,get,update,delete}`, `container.operations.get`, `iam.serviceAccounts.actAs` (checked as the impersonated account when set) | Grant `roles/container.admin` and `roles/iam.serviceAccountUser` |
+| Permissions | Missing any of `container.clusters.{create,get,update,delete}`, `container.operations.get`, `iam.serviceAccounts.actAs` (checked as the impersonated account when set; `actAs` is checked on the node service account instead when one is set) | Grant `roles/container.admin` and `roles/iam.serviceAccountUser` |
+| Node service account | Reports the account nodes will run as; if `nodeServiceAccount` is set, fails when it doesn't exist or the caller lacks `iam.serviceAccounts.actAs` on it | Create it, or grant `roles/iam.serviceAccountUser` on it |
 
 ## OpenTofu engine and container runner
 
@@ -457,7 +459,7 @@ Only the single credentials file is mounted, not the whole gcloud folder.
 
 ## GKE module (`internal/platform/gke/module`)
 
-**Variables** (mirrored by `gke.Variables`): `name`, `project`, `location`, `release_channel`, `kubernetes_version` (optional), `network`, `subnetwork`, `node_pools` (list of name, machine type, count, spot, disk size), `labels`, `impersonate_service_account` (optional), `deletion_protection` (default false for v0.1).
+**Variables** (mirrored by `gke.Variables`): `name`, `project`, `location`, `release_channel`, `kubernetes_version` (optional), `network`, `subnetwork`, `node_pools` (list of name, machine type, count, spot, disk size), `labels`, `impersonate_service_account` (optional), `node_service_account` (optional; null = Compute Engine default service account), `deletion_protection` (default false for v0.1).
 
 **Resources:** `google_container_cluster` with the default node pool removed (as in the demo), Workload Identity enabled, and legacy client certificates turned off (users sign in with their Google identity). One `google_container_node_pool` per entry in `node_pools`, with auto-repair and auto-upgrade on.
 

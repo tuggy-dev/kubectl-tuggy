@@ -89,6 +89,12 @@ variable "impersonate_service_account" {
   default     = null
 }
 
+variable "node_service_account" {
+  description = "Service account email the node VMs run as, used to pull images and write logs and metrics. Null uses the project's default Compute Engine service account."
+  type        = string
+  default     = null
+}
+
 variable "deletion_protection" {
   description = "Block deletion of the cluster until this is set to false."
   type        = bool

@@ -18,3 +18,5 @@ spec:
   platformConfig:                 # GKE-specific settings, checked by the gke platform
     project: my-project-id
     location: us-central1-a       # a zone gives a zonal cluster, a region a regional one
+    # nodeServiceAccount: gke-nodes@my-project-id.iam.gserviceaccount.com
+    #                               # the nodes' identity; omit to use the Compute Engine default account
