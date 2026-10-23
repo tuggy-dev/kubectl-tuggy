@@ -267,6 +267,31 @@ kubectl tuggy doctor --platform gke --project my-project \
 
 Your account needs the **Service Account Token Creator** role on that service account, and `doctor` then checks the project permissions *as the service account*. Add the same flag to `create cluster`, or `impersonateServiceAccount:` under `platformConfig` in a spec file. kubectl still connects as you, so your own account needs GKE access too (for example `roles/container.developer`).
 
+## A local cluster with kind
+
+For development you can build a cluster on your own computer instead, with [kind](https://kind.sigs.k8s.io/): the nodes are Docker containers, it takes about a minute and costs nothing. You need only Docker (Docker Desktop, Colima, …) and the `docker` command; no cloud account.
+
+```sh
+kubectl tuggy doctor --platform kind
+kubectl tuggy create cluster dev --platform kind --ttl 8h
+kubectl get nodes                      # tuggy-dev-control-plane and tuggy-dev-worker
+kubectl tuggy delete cluster dev
+```
+
+The same `get`, `describe` and `delete` commands work as for GKE. The kind cluster is named `tuggy-dev`, so it never clashes with clusters you make with `kind` directly.
+
+| Flag | Meaning |
+|---|---|
+| `--node-count` | Worker nodes (default 1); the control-plane node is extra |
+| `--kubernetes-version` | A version this tuggy has a node image for, such as `1.37` |
+| `--node-image` | An exact node image instead, for example a custom-built one |
+| `--control-planes` | `1` (default) or `3` |
+| `--api-server-port` | Host port for the Kubernetes API (default: a random free port) |
+
+`--machine-type` and `--spot` are cloud settings and are rejected for kind. Host directory mounts and port mappings go in a spec file: see [examples/cluster-kind.yaml](examples/cluster-kind.yaml).
+
+Unlike GKE, a kind cluster has no Google identity for pods, `LoadBalancer` services stay pending (use `NodePort` with a port mapping), and images you build locally must be loaded into the nodes (`kind load docker-image IMAGE --name tuggy-dev`).
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -287,7 +312,7 @@ Your account needs the **Service Account Token Creator** role on that service ac
 
 | Path | What |
 |---|---|
-| `~/.tuggy/clusters/<name>/` | Each cluster's record, its OpenTofu files and state, and logs |
+| `~/.tuggy/clusters/<name>/` | Each cluster's record, its platform files (OpenTofu files and state for GKE, `kind-cluster.json` for kind), and logs |
 | `~/.tuggy/cache/` | Downloaded OpenTofu providers, shared by all clusters |
 | `~/.tuggy/logs/<name>/` | Logs of deleted clusters |
 | `~/.kube/config` | Your kubeconfig. tuggy only adds and removes entries named `tuggy-<name>` |

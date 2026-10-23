@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -16,13 +17,20 @@ func newDoctorCommand(app *App) *cobra.Command {
 		Long: `Run the same checks "create cluster" runs first, without creating anything,
 and show how to fix each problem found.`,
 		Example: `  kubectl tuggy doctor --platform gke --project my-project
+  kubectl tuggy doctor --platform kind
   kubectl tuggy doctor -f cluster.yaml`,
 		Args: usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// The checks don't depend on the location, so supply one when
-			// it is left out rather than make the user invent it.
+			// the selected platform has a --location flag and it is left
+			// out, rather than make the user invent it.
 			if spec.file == "" {
-				if fl := cmd.Flags().Lookup("location"); fl != nil && !fl.Changed {
+				name, err := spec.platformName(cmd, app.Platforms)
+				if err != nil {
+					return usageError(cmd, err)
+				}
+				fl := cmd.Flags().Lookup("location")
+				if fl != nil && !fl.Changed && slices.Contains(fl.Annotations[platformFlagAnnotation], name) {
 					_ = cmd.Flags().Set("location", "us-central1")
 				}
 			}
