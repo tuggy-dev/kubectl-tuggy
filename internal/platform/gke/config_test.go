@@ -33,13 +33,17 @@ func TestDecodeConfigAllFields(t *testing.T) {
 		"releaseChannel": "stable",
 		"network": "tuggy-vpc",
 		"subnetwork": "tuggy-subnet",
-		"impersonateServiceAccount": "opentofu@acme-dev.iam.gserviceaccount.com"
+		"impersonateServiceAccount": "opentofu@acme-dev.iam.gserviceaccount.com",
+		"nodeServiceAccount": "gke-nodes@acme-dev.iam.gserviceaccount.com"
 	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.ReleaseChannel != "STABLE" {
 		t.Errorf("release channel should be upper-cased, got %q", cfg.ReleaseChannel)
+	}
+	if cfg.NodeServiceAccount != "gke-nodes@acme-dev.iam.gserviceaccount.com" {
+		t.Errorf("node service account = %q", cfg.NodeServiceAccount)
 	}
 	if !cfg.Regional() {
 		t.Error("europe-west4 is a region")
@@ -56,6 +60,7 @@ func TestDecodeConfigErrors(t *testing.T) {
 		{"bad location", `{"project":"acme-dev","location":"Iowa"}`, "spec.platformConfig.location", "not a zone"},
 		{"bad channel", `{"project":"acme-dev","location":"us-central1","releaseChannel":"FAST"}`, "spec.platformConfig.releaseChannel", "not one of"},
 		{"bad service account", `{"project":"acme-dev","location":"us-central1","impersonateServiceAccount":"me@gmail.com"}`, "spec.platformConfig.impersonateServiceAccount", "not a service account"},
+		{"bad node service account", `{"project":"acme-dev","location":"us-central1","nodeServiceAccount":"123-compute@developer.gserviceaccount"}`, "spec.platformConfig.nodeServiceAccount", "not a service account"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

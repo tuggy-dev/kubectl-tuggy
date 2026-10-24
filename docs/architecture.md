@@ -317,6 +317,7 @@ flowchart TB
 - **Discovery** follows Google's tools: `GOOGLE_APPLICATION_CREDENTIALS`, then `$CLOUDSDK_CONFIG`, then `%APPDATA%\gcloud` on Windows or `~/.config/gcloud` elsewhere. Supported types: `authorized_user`, `service_account`, `impersonated_service_account`, `external_account` (with a warning).
 - **Least exposure.** Only the single credentials file is mounted into the container, read-only. OpenTofu state, plans and logs live in owner-only folders.
 - **Impersonation.** With `impersonateServiceAccount`, OpenTofu acts as the service account, and preflight checks permissions *as that account*. kubectl still connects as the user.
+- **Node identity.** Node VMs run as `nodeServiceAccount`, or the project's Compute Engine default service account when it is empty. Nodes use it to pull images and write logs and metrics; workloads get their own identities through Workload Identity, which the module always enables. Preflight checks the account exists and that the caller has `iam.serviceAccounts.actAs` on it.
 
 ## 10. Files on disk
 

@@ -267,6 +267,26 @@ kubectl tuggy doctor --platform gke --project my-project \
 
 Your account needs the **Service Account Token Creator** role on that service account, and `doctor` then checks the project permissions *as the service account*. Add the same flag to `create cluster`, or `impersonateServiceAccount:` under `platformConfig` in a spec file. kubectl still connects as you, so your own account needs GKE access too (for example `roles/container.developer`).
 
+## Choosing the nodes' service account
+
+Nodes pull container images and write logs and metrics as a Google service account. By default that is the project's **Compute Engine default service account** (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`). To use a dedicated one instead:
+
+```sh
+kubectl tuggy create cluster --platform gke --project my-project --location us-central1-a \
+  --node-service-account gke-nodes@my-project.iam.gserviceaccount.com
+```
+
+Or set `nodeServiceAccount:` under `platformConfig` in a spec file. A typical node account has just two roles:
+
+| Role | Where | Why |
+|---|---|---|
+| `roles/container.defaultNodeServiceAccount` | the project | logs, metrics and other node basics |
+| `roles/artifactregistry.reader` | the image repository (or project) | pull private images from Artifact Registry |
+
+Whoever creates the cluster needs **Service Account User** (`roles/iam.serviceAccountUser`) on that account; `doctor` checks this. Give applications their own permissions through Workload Identity (each Kubernetes ServiceAccount gets its own Google identity), not through the node account.
+
+If a pod can't pull its image (`403 Forbidden` from `*-docker.pkg.dev`), the node account, default or custom, is missing `roles/artifactregistry.reader`.
+
 ## A local cluster with kind
 
 For development you can build a cluster on your own computer instead, with [kind](https://kind.sigs.k8s.io/): the nodes are Docker containers, it takes about a minute and costs nothing. You need only Docker (Docker Desktop, Colima, …) and the `docker` command; no cloud account.
@@ -300,6 +320,9 @@ Unlike GKE, a kind cluster has no Google identity for pods, `LoadBalancer` servi
 | `Container engine: cannot reach Docker at ...` | Start your engine (Docker Desktop, `colima start`, …) and check `docker ps` works in the same terminal. tuggy finds the engine like `docker` does: `DOCKER_HOST`, then the current `docker context`. |
 | `Permissions in my-project: your account is missing ...` | Ask a project admin for `roles/container.admin` and `roles/iam.serviceAccountUser`. |
 | `Kubernetes Engine API in my-project: not enabled` | `gcloud services enable container.googleapis.com --project my-project` |
+| `Node service account ...: does not exist` | Check the email (`gcloud iam service-accounts list --project my-project`) or create the account. |
+| `Node service account ...: your account cannot run nodes as this account` | Ask a project admin for `roles/iam.serviceAccountUser` on that service account. |
+| Pods stuck in `ImagePullBackOff` with `403 Forbidden` from Artifact Registry | Grant the node service account `roles/artifactregistry.reader` on the repository. |
 | `gke-gcloud-auth-plugin: not found on PATH` | `gcloud components install gke-gcloud-auth-plugin`, then open a new terminal. |
 | `another kubectl tuggy command is working on cluster "dev"` | Another terminal is creating or deleting it. Wait for it to finish. |
 | `cluster "dev" already exists (Ready)` | Pick another name, or delete it first. |

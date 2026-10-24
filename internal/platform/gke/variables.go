@@ -20,6 +20,7 @@ type Variables struct {
 	NodePools                 []NodePool        `json:"node_pools"`
 	Labels                    map[string]string `json:"labels"`
 	ImpersonateServiceAccount *string           `json:"impersonate_service_account"`
+	NodeServiceAccount        *string           `json:"node_service_account"`
 	DeletionProtection        bool              `json:"deletion_protection"`
 }
 
@@ -62,6 +63,9 @@ func variablesFromSpec(c *v1alpha1.Cluster, cfg Config, now time.Time) Variables
 	}
 	if cfg.ImpersonateServiceAccount != "" {
 		v.ImpersonateServiceAccount = ptr(cfg.ImpersonateServiceAccount)
+	}
+	if cfg.NodeServiceAccount != "" {
+		v.NodeServiceAccount = ptr(cfg.NodeServiceAccount)
 	}
 	if c.Spec.TTL != nil && c.Spec.TTL.Duration > 0 {
 		v.Labels[LabelExpiresAt] = strconv.FormatInt(now.Add(c.Spec.TTL.Duration).Unix(), 10)
