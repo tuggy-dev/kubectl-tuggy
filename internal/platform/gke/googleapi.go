@@ -23,6 +23,7 @@ type googleAPI struct {
 	ResourceManagerURL string
 	ServiceUsageURL    string
 	IAMCredentialsURL  string
+	IAMURL             string
 	HTTPClient         *http.Client
 
 	// TokenSource turns credentials into access tokens. Tests replace it.
@@ -34,6 +35,7 @@ func newGoogleAPI() *googleAPI {
 		ResourceManagerURL: "https://cloudresourcemanager.googleapis.com",
 		ServiceUsageURL:    "https://serviceusage.googleapis.com",
 		IAMCredentialsURL:  "https://iamcredentials.googleapis.com",
+		IAMURL:             "https://iam.googleapis.com",
 		HTTPClient:         &http.Client{Timeout: 30 * time.Second},
 		TokenSource:        googleTokenSource,
 	}
@@ -133,4 +135,15 @@ func (g *googleAPI) impersonate(ctx context.Context, token, serviceAccount strin
 	u := fmt.Sprintf("%s/v1/projects/-/serviceAccounts/%s:generateAccessToken", g.IAMCredentialsURL, url.PathEscape(serviceAccount))
 	err := g.call(ctx, token, http.MethodPost, u, map[string]any{"scope": []string{cloudPlatformScope}}, &out)
 	return out.AccessToken, err
+}
+
+// serviceAccountPermissions returns which of perms the token holds on the
+// service account. A missing account is an *apiError with HTTP 404.
+func (g *googleAPI) serviceAccountPermissions(ctx context.Context, token, serviceAccount string, perms []string) ([]string, error) {
+	var out struct {
+		Permissions []string `json:"permissions"`
+	}
+	u := fmt.Sprintf("%s/v1/projects/-/serviceAccounts/%s:testIamPermissions", g.IAMURL, url.PathEscape(serviceAccount))
+	err := g.call(ctx, token, http.MethodPost, u, map[string]any{"permissions": perms}, &out)
+	return out.Permissions, err
 }

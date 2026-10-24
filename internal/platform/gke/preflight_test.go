@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/spf13/pflag"
 	"golang.org/x/oauth2"
 
 	"github.com/tuggy-dev/kubectl-tuggy/internal/platform"
@@ -25,6 +26,10 @@ type fakeGoogle struct {
 	apiState      string              // "ENABLED", "DISABLED", or "" for 403
 	impersonateOK bool
 	tokensSeen    []string
+
+	// Service accounts that exist, and per token the ones it may act as.
+	serviceAccounts map[string]bool
+	actAs           map[string][]string
 }
 
 func (f *fakeGoogle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +39,18 @@ func (f *fakeGoogle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Unlock()
 
 	switch {
+	case strings.Contains(r.URL.Path, "/serviceAccounts/") && strings.HasSuffix(r.URL.Path, ":testIamPermissions"):
+		sa := strings.TrimSuffix(r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:], ":testIamPermissions")
+		if !f.serviceAccounts[sa] {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":{"message":"Unknown service account"}}`))
+			return
+		}
+		var out []string
+		if slices.Contains(f.actAs[token], sa) {
+			out = []string{actAs}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"permissions": out})
 	case strings.HasSuffix(r.URL.Path, ":testIamPermissions"):
 		var req struct{ Permissions []string }
 		_ = json.NewDecoder(r.Body).Decode(&req)
@@ -84,7 +101,7 @@ func newPreflightHarness(t *testing.T) *preflightHarness {
 	p.CredentialsPath = func() string { return credsPath }
 	p.LookPath = func(string) (string, error) { return "/usr/local/bin/gke-gcloud-auth-plugin", nil }
 	p.api = &googleAPI{
-		ResourceManagerURL: srv.URL, ServiceUsageURL: srv.URL, IAMCredentialsURL: srv.URL,
+		ResourceManagerURL: srv.URL, ServiceUsageURL: srv.URL, IAMCredentialsURL: srv.URL, IAMURL: srv.URL,
 		HTTPClient: srv.Client(),
 		TokenSource: func(context.Context, *Credentials) (oauth2.TokenSource, error) {
 			return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "user-token"}), nil
@@ -260,5 +277,82 @@ func TestPreflightCredentialsUnusable(t *testing.T) {
 	r := find(h.run(t, minimalSpec), "Google sign-in")
 	if r == nil || r.Status != platform.CheckFail || !strings.Contains(r.Message, "missing client_id") {
 		t.Errorf("sign-in check = %+v", r)
+	}
+}
+
+const nodeAccountSpec = `
+apiVersion: tuggy.dev/v1alpha1
+kind: Cluster
+metadata: {name: dev}
+spec:
+  platform: gke
+  platformConfig:
+    project: acme-dev
+    location: us-central1-a
+    nodeServiceAccount: gke-nodes@acme-dev.iam.gserviceaccount.com
+`
+
+const nodeAccount = "gke-nodes@acme-dev.iam.gserviceaccount.com"
+
+func TestPreflightDefaultNodeServiceAccount(t *testing.T) {
+	h := newPreflightHarness(t)
+	results := h.run(t, minimalSpec)
+	r := find(results, "Node service account")
+	if r == nil || r.Status != platform.CheckPass || !strings.Contains(r.Message, "Compute Engine default service account") {
+		t.Errorf("node service account check = %+v", r)
+	}
+}
+
+func TestPreflightNodeServiceAccount(t *testing.T) {
+	h := newPreflightHarness(t)
+	h.google.serviceAccounts = map[string]bool{nodeAccount: true}
+	h.google.actAs = map[string][]string{"user-token": {nodeAccount}}
+	// actAs granted on the node account alone, not on the whole project.
+	h.google.granted["user-token"] = slices.DeleteFunc(slices.Clone(requiredPermissions), func(p string) bool { return p == actAs })
+	results := h.run(t, nodeAccountSpec)
+	if platform.Failed(results) {
+		t.Fatalf("unexpected failure: %+v", results)
+	}
+	if r := find(results, "Node service account "+nodeAccount); r == nil || r.Status != platform.CheckPass {
+		t.Errorf("node service account check = %+v", r)
+	}
+}
+
+func TestPreflightNodeServiceAccountWithoutActAs(t *testing.T) {
+	h := newPreflightHarness(t)
+	h.google.serviceAccounts = map[string]bool{nodeAccount: true}
+	results := h.run(t, nodeAccountSpec)
+	r := find(results, "Node service account")
+	if r == nil || r.Status != platform.CheckFail || !strings.Contains(r.Fix, "roles/iam.serviceAccountUser on "+nodeAccount) {
+		t.Errorf("node service account check = %+v", r)
+	}
+}
+
+func TestPreflightNodeServiceAccountMissing(t *testing.T) {
+	h := newPreflightHarness(t)
+	results := h.run(t, nodeAccountSpec)
+	r := find(results, "Node service account")
+	if r == nil || r.Status != platform.CheckFail || r.Message != "does not exist" {
+		t.Errorf("node service account check = %+v", r)
+	}
+}
+
+func TestNodeServiceAccountFlag(t *testing.T) {
+	p := testPlatform()
+	fs := pflag.NewFlagSet("create", pflag.ContinueOnError)
+	p.AddFlags(fs)
+	if err := fs.Parse([]string{"--project", "acme-dev", "--node-service-account", nodeAccount}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := p.PlatformConfigFromFlags(fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]string
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg["nodeServiceAccount"] != nodeAccount {
+		t.Errorf("platformConfig from flags = %s", raw)
 	}
 }

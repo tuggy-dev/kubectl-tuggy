@@ -93,6 +93,7 @@ const (
 	flagNetwork        = "network"
 	flagSubnetwork     = "subnetwork"
 	flagImpersonate    = "impersonate-service-account"
+	flagNodeAccount    = "node-service-account"
 )
 
 // flagFields maps each flag to its platformConfig field.
@@ -103,6 +104,7 @@ var flagFields = map[string]string{
 	flagNetwork:        "network",
 	flagSubnetwork:     "subnetwork",
 	flagImpersonate:    "impersonateServiceAccount",
+	flagNodeAccount:    "nodeServiceAccount",
 }
 
 // AddFlags registers the GKE flags.
@@ -113,6 +115,7 @@ func (p *Platform) AddFlags(fs *pflag.FlagSet) {
 	fs.String(flagNetwork, "", "VPC network (gke, default \"default\")")
 	fs.String(flagSubnetwork, "", "subnetwork (gke)")
 	fs.String(flagImpersonate, "", "service account email to act as (gke)")
+	fs.String(flagNodeAccount, "", "service account email the nodes run as (gke, default: the project's Compute Engine default service account)")
 }
 
 // PlatformConfigFromFlags builds spec.platformConfig from the GKE flags the

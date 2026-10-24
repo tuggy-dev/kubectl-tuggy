@@ -28,5 +28,6 @@
     "tuggy-expires-at": "1791414000"
   },
   "impersonate_service_account": "opentofu@acme-prod.iam.gserviceaccount.com",
+  "node_service_account": "gke-nodes@acme-prod.iam.gserviceaccount.com",
   "deletion_protection": false
 }

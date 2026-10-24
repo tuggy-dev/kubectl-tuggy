@@ -15,15 +15,19 @@ import (
 )
 
 // requiredPermissions are what creating, updating and deleting a cluster
-// needs. iam.serviceAccounts.actAs is for the node pools' service account.
+// needs. iam.serviceAccounts.actAs is for the node pools' service account:
+// checked on the project for the default Compute Engine account, or on the
+// account itself when nodeServiceAccount is set.
 var requiredPermissions = []string{
 	"container.clusters.create",
 	"container.clusters.get",
 	"container.clusters.update",
 	"container.clusters.delete",
 	"container.operations.get",
-	"iam.serviceAccounts.actAs",
+	actAs,
 }
+
+const actAs = "iam.serviceAccounts.actAs"
 
 const authPlugin = "gke-gcloud-auth-plugin"
 
@@ -80,8 +84,37 @@ func (p *Platform) Preflight(ctx context.Context, plan *platform.Plan) []platfor
 	}
 
 	add(p.checkAPIEnabled(ctx, token, vars.Project))
-	add(p.checkPermissions(ctx, token, vars.Project, who))
+	perms := requiredPermissions
+	if vars.NodeServiceAccount != nil {
+		// actAs is needed on the node account, which may be granted on the
+		// account alone rather than the whole project.
+		perms = slices.DeleteFunc(slices.Clone(perms), func(p string) bool { return p == actAs })
+	}
+	add(p.checkPermissions(ctx, token, vars.Project, who, perms))
+	add(p.checkNodeServiceAccount(ctx, token, vars.NodeServiceAccount, who))
 	return results
+}
+
+// checkNodeServiceAccount reports which service account the nodes will run
+// as and, for a custom one, that it exists and that the caller may attach it
+// to the node VMs (iam.serviceAccounts.actAs on it).
+func (p *Platform) checkNodeServiceAccount(ctx context.Context, token string, sa *string, who string) platform.CheckResult {
+	if sa == nil {
+		return pass("Node service account", "the project's Compute Engine default service account; it needs roles/artifactregistry.reader to pull private images")
+	}
+	name := "Node service account " + *sa
+	granted, err := p.api.serviceAccountPermissions(ctx, token, *sa, []string{actAs})
+	var apiErr *apiError
+	switch {
+	case errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound:
+		return fail(name, "does not exist", "Create it, or check the email: gcloud iam service-accounts list")
+	case err != nil:
+		return fail(name, err.Error(), fmt.Sprintf("Check that %s exists and that %s can see it", *sa, who))
+	case !slices.Contains(granted, actAs):
+		return fail(name, fmt.Sprintf("%s cannot run nodes as this account (missing %s)", who, actAs),
+			fmt.Sprintf("Ask a project admin to grant %s roles/iam.serviceAccountUser on %s", who, *sa))
+	}
+	return pass(name, "nodes will run as this account")
 }
 
 func (p *Platform) checkEngine(ctx context.Context) platform.CheckResult {
@@ -146,14 +179,14 @@ func (p *Platform) checkAPIEnabled(ctx context.Context, token, project string) p
 	return pass(name, "enabled")
 }
 
-func (p *Platform) checkPermissions(ctx context.Context, token, project, who string) platform.CheckResult {
+func (p *Platform) checkPermissions(ctx context.Context, token, project, who string, required []string) platform.CheckResult {
 	name := "Permissions in " + project
-	granted, err := p.api.grantedPermissions(ctx, token, project, requiredPermissions)
+	granted, err := p.api.grantedPermissions(ctx, token, project, required)
 	if err != nil {
 		return fail(name, err.Error(), "Check that project "+project+" exists and that "+who+" can access it")
 	}
 	var missing []string
-	for _, perm := range requiredPermissions {
+	for _, perm := range required {
 		if !slices.Contains(granted, perm) {
 			missing = append(missing, perm)
 		}
