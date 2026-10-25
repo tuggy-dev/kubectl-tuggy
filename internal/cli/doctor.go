@@ -26,7 +26,13 @@ and show how to fix each problem found.`,
 					_ = cmd.Flags().Set("location", "us-central1")
 				}
 			}
-			c, p, err := spec.build(cmd, "doctor", app.Platforms)
+			// Without -f the flags describe a hypothetical cluster, so give it a
+			// placeholder name; with -f the file names the cluster itself.
+			name := "doctor"
+			if spec.file != "" {
+				name = ""
+			}
+			c, p, err := spec.build(cmd, name, app.Platforms)
 			if err != nil {
 				return err
 			}
