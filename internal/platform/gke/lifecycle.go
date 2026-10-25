@@ -61,6 +61,10 @@ func (p *Platform) Create(ctx context.Context, plan *platform.Plan, opts platfor
 		return nil, err
 	}
 
+	if err := p.removeLeftoverDefaultPool(ctx, vars, opts.OnProgress); err != nil {
+		return nil, err
+	}
+
 	outputs, err := eng.Outputs(ctx, ws)
 	if err != nil {
 		return nil, err

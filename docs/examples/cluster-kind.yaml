@@ -1,0 +1,20 @@
+# A local kind cluster for development: free, built in Docker in about a
+# minute, no cloud account needed.
+#
+# Create it with:
+#   kubectl tuggy create cluster -f docs/examples/cluster-kind.yaml
+apiVersion: tuggy.dev/v1alpha1
+kind: Cluster
+metadata:
+  name: dev                       # the kind cluster is named tuggy-dev
+spec:
+  platform: kind
+  kubernetesVersion: ""           # empty = the kind release's default
+  ttl: 8h                         # tuggy reports the cluster as expired after 8 hours; 0 = never
+  nodePools:
+    - name: default
+      count: 1                    # worker nodes, labelled tuggy.dev/node-pool=default
+                                  # (machineType, spot and diskSizeGB are cloud-only and rejected)
+  platformConfig:                 # kind-specific settings, checked by the kind platform
+    controlPlanes: 1              # 1 or 3
+    apiServerPort: 0              # 0 = a random free port

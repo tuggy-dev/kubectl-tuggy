@@ -43,6 +43,9 @@ command again to finish it.`,
 		Example: `  # A GKE cluster that is reported as expired after 8 hours
   kubectl tuggy create cluster dev --platform gke --project my-project --location us-central1-a --ttl 8h
 
+  # A local kind cluster in Docker: free, ready in about a minute
+  kubectl tuggy create cluster dev --platform kind
+
   # From a spec file
   kubectl tuggy create cluster -f cluster.yaml
 
@@ -61,7 +64,7 @@ command again to finish it.`,
 	markPlatformFlags(cluster, app.Platforms)
 	cluster.Flags().BoolVar(&opts.dryRun, "dry-run", false, "show what would be built without building anything")
 	cluster.Flags().BoolVar(&opts.noKubeconfig, "no-kubeconfig", false, "don't add the cluster to your kubeconfig")
-	cluster.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "show OpenTofu's full output")
+	cluster.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "show the full output of the tools building the cluster")
 
 	create.AddCommand(cluster)
 	return create

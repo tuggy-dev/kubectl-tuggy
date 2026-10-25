@@ -6,5 +6,6 @@
 package platforms
 
 import (
-	_ "github.com/tuggy-dev/kubectl-tuggy/internal/platform/gke" // Google Kubernetes Engine
+	_ "github.com/tuggy-dev/kubectl-tuggy/internal/platform/gke"  // Google Kubernetes Engine
+	_ "github.com/tuggy-dev/kubectl-tuggy/internal/platform/kind" // local clusters in Docker
 )

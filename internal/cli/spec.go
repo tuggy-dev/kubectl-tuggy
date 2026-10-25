@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -65,16 +66,15 @@ func (f *specFlags) build(cmd *cobra.Command, name string, platforms *platform.R
 		return nil, nil, usageError(cmd, errors.New("a cluster name is required, or a spec file with -f"))
 	}
 
-	platformName := f.platform
-	if platformName == "" {
-		names := platforms.Names()
-		if len(names) != 1 {
-			return nil, nil, usageError(cmd, fmt.Errorf("--platform is required (one of %s)", strings.Join(names, ", ")))
-		}
-		platformName = names[0]
+	platformName, err := f.platformName(cmd, platforms)
+	if err != nil {
+		return nil, nil, usageError(cmd, err)
 	}
 	p, err := platforms.Get(platformName)
 	if err != nil {
+		return nil, nil, usageError(cmd, err)
+	}
+	if err := rejectOtherPlatformFlags(cmd, platformName); err != nil {
 		return nil, nil, usageError(cmd, err)
 	}
 
@@ -102,6 +102,55 @@ func (f *specFlags) build(cmd *cobra.Command, name string, platforms *platform.R
 		c.Spec.PlatformConfig = raw
 	}
 	return finish(cmd, c, p)
+}
+
+// platformName returns the platform the flags select: --platform if given;
+// otherwise the platform that owns every platform-specific flag the user set,
+// such as gke for --project; otherwise the only registered platform.
+func (f *specFlags) platformName(cmd *cobra.Command, platforms *platform.Registry) (string, error) {
+	if f.platform != "" {
+		return f.platform, nil
+	}
+	owners := setFlagOwners(cmd)
+	switch {
+	case len(owners) == 1:
+		return owners[0], nil
+	case len(owners) > 1:
+		return "", fmt.Errorf("flags for %s were given; choose one with --platform", strings.Join(owners, " and "))
+	}
+	names := platforms.Names()
+	if len(names) != 1 {
+		return "", fmt.Errorf("--platform is required (one of %s)", strings.Join(names, ", "))
+	}
+	return names[0], nil
+}
+
+// setFlagOwners returns, sorted, the platforms owning the platform-specific
+// flags the user set.
+func setFlagOwners(cmd *cobra.Command) []string {
+	var owners []string
+	cmd.Flags().Visit(func(fl *pflag.Flag) {
+		for _, owner := range fl.Annotations[platformFlagAnnotation] {
+			if !slices.Contains(owners, owner) {
+				owners = append(owners, owner)
+			}
+		}
+	})
+	slices.Sort(owners)
+	return owners
+}
+
+// rejectOtherPlatformFlags fails if the user set a flag that belongs to a
+// platform other than the selected one, which that platform would ignore.
+func rejectOtherPlatformFlags(cmd *cobra.Command, platformName string) error {
+	var err error
+	cmd.Flags().Visit(func(fl *pflag.Flag) {
+		owners := fl.Annotations[platformFlagAnnotation]
+		if err == nil && len(owners) > 0 && !slices.Contains(owners, platformName) {
+			err = fmt.Errorf("--%s is a %s flag; this cluster uses %s", fl.Name, strings.Join(owners, "/"), platformName)
+		}
+	})
+	return err
 }
 
 func (f *specFlags) fromFile(cmd *cobra.Command, name string, platforms *platform.Registry) (*v1alpha1.Cluster, platform.Platform, error) {
