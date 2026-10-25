@@ -308,7 +308,20 @@ The same `get`, `describe` and `delete` commands work as for GKE. The kind clust
 | `--control-planes` | `1` (default) or `3` |
 | `--api-server-port` | Host port for the Kubernetes API (default: a random free port) |
 
-`--machine-type` and `--spot` are cloud settings and are rejected for kind. Host directory mounts and port mappings go in a spec file: see [examples/cluster-kind.yaml](examples/cluster-kind.yaml).
+`--machine-type` and `--spot` are cloud settings and are rejected for kind. A spec file version is in [examples/cluster-kind.yaml](examples/cluster-kind.yaml). Two optional settings exist only in spec files, because they are lists:
+
+```yaml
+platformConfig:
+  extraMounts:                # a folder on your computer, visible inside every node
+    - hostPath: ./fixtures    # must exist; relative to the directory you run tuggy from
+      containerPath: /mnt/fixtures
+      readOnly: true
+  extraPortMappings:          # a port on your computer forwarded to the first control-plane node
+    - containerPort: 30080    # e.g. a NodePort service's nodePort
+      hostPort: 8080          # then open http://localhost:8080; the port must be free
+```
+
+Most clusters need neither: `kubectl port-forward` reaches a service without any cluster setting.
 
 Unlike GKE, a kind cluster has no Google identity for pods, `LoadBalancer` services stay pending (use `NodePort` with a port mapping), and images you build locally must be loaded into the nodes (`kind load docker-image IMAGE --name tuggy-dev`).
 

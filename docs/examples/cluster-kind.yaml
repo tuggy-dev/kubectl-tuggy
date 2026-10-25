@@ -18,10 +18,3 @@ spec:
   platformConfig:                 # kind-specific settings, checked by the kind platform
     controlPlanes: 1              # 1 or 3
     apiServerPort: 0              # 0 = a random free port
-    extraMounts:                  # host directories visible inside every node
-      - hostPath: ./data          # relative to the directory you run tuggy from
-        containerPath: /mnt/data
-        readOnly: true
-    extraPortMappings:            # host ports forwarded to the first control-plane node
-      - containerPort: 30080      # e.g. a NodePort service
-        hostPort: 8080            # then open http://localhost:8080
