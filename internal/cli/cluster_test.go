@@ -530,6 +530,27 @@ func TestDoctor(t *testing.T) {
 	}
 }
 
+// TestDoctorWithSpecFile checks doctor -f with a spec file named like a real
+// cluster: doctor must check that file's platform, not compare its name with
+// a placeholder.
+func TestDoctorWithSpecFile(t *testing.T) {
+	e := newEnv(t)
+	e.fake.Checks = []platform.CheckResult{{Name: "Engine", Status: platform.CheckPass, Message: "reachable"}}
+	spec := filepath.Join(t.TempDir(), "cluster.yaml")
+	writeFile(t, spec, "apiVersion: tuggy.dev/v1alpha1\nkind: Cluster\nmetadata: {name: dev}\nspec:\n  platform: fake\n")
+
+	code, out, errOut := e.run(t, "doctor", "-f", spec)
+	if code != ExitOK || !strings.Contains(out, "✓ Engine: reachable") {
+		t.Fatalf("exit %d\n%s%s", code, out, errOut)
+	}
+	if !slices.Contains(e.fake.Calls(), "Preflight") {
+		t.Error("doctor -f should run the file's platform checks")
+	}
+	if slices.Contains(e.fake.Calls(), "Create") {
+		t.Error("doctor must never create anything")
+	}
+}
+
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
